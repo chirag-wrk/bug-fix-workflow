@@ -34,7 +34,7 @@
 6. **Document environment details** where reproduction was attempted — versions, platform, configuration, prerequisites, and execution mode (repo-local / must-gather / live cluster).
 7. **Conclude**: Bug Confirmed (reproducible) | Bug Not Confirmed (with explanation of what was different) | Partial (some steps reproduced, others could not be verified — including missing live cluster when required).
 
-## Quality Rulesractical rule: If the bug reproduces via tests/envtest or is confirmed from must-gather, do the whole Repro Verification stage in Cursor chat. If it needs a real OpenShift cluster and you don’t have access here, mark Partial and document that limitation — don’t pretend live steps ran.
+## Quality Rules
 
 - Every reproduction step MUST have an observed result documented — no step left without output.
 - Logs MUST be timestamped and include relevant context (pod name, namespace, controller).
