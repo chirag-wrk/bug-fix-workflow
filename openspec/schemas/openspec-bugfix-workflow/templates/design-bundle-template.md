@@ -1,48 +1,54 @@
-# Implementation Design Bundle
+# Bug Fix Design Bundle
 
 **Change:** [CHANGE_NAME]
 **Jira:** [JIRA_KEY]
-**Phase:** [PHASE_NAME]
 **Current Task:** [TASK_ID — e.g. T1_1]
 **Task Title:** [TASK_TITLE]
 
-This bundle replaces an OpenShift Enhancement Proposal (EP) when driving OAPE
-commands from `/opsx:apply`. It is composed from approved OpenSpec artifacts
-and scoped to the **current task only** (one Task ID per OAPE invocation).
+This bundle drives OAPE commands from `/opsx:apply` for bug fix implementation.
+It is composed from approved OpenSpec bug fix artifacts and scoped to the
+**current task only** (one Task ID per OAPE invocation).
 
 ---
 
 ## Input precedence (conflicts)
 
 1. constitution.md (non-negotiable guardrails)
-2. specs.md (requirements and acceptance criteria)
-3. plan.md (architectural context and verification hooks)
-4. repo-assessment.md (target files, Makefile targets, evidence)
-5. tasks.md §4 payload for the **current Task ID** (most specific)
+2. rca-report.md (root cause analysis — most critical for bug fix)
+3. bugfix-plan.md (fix approach, target files, verification)
+4. bug-report.md (bug details, ARD context, original PR references)
+5. repro-verification-report.md (reproduction evidence, failure signature)
+6. tasks.md §4 payload for the **current Task ID** (most specific)
 
 ---
 
 ## Constitution (guardrails)
 
-<!-- Paste or summarize constitution.md sections relevant to this phase -->
+<!-- Paste or summarize constitution.md sections relevant to this fix -->
 
 ---
 
-## Specifications (requirements)
+## Root Cause Analysis (RCA)
 
-<!-- Paste or summarize specs.md: user stories, FR-*, SC-*, AC-* traced by this task -->
-
----
-
-## Plan (architectural context)
-
-<!-- Paste or summarize plan.md phase goals, target files, verification hooks for this task -->
+<!-- Paste or summarize rca-report.md: root cause statement, affected components, fix area -->
 
 ---
 
-## Repo assessment (grounding)
+## Bug Fix Plan (fix approach)
 
-<!-- Paste repo-assessment.md excerpts: target paths, Makefile targets, patterns -->
+<!-- Paste or summarize bugfix-plan.md: fix strategy, target files, verification matrix -->
+
+---
+
+## Bug Report (context)
+
+<!-- Paste or summarize bug-report.md: bug description, steps to reproduce, ARD context, original PR diffs -->
+
+---
+
+## Repro Verification (evidence)
+
+<!-- Paste or summarize repro-verification-report.md: failure signature, logs captured -->
 
 ---
 
@@ -102,13 +108,13 @@ and scoped to the **current task only** (one Task ID per OAPE invocation).
 
 ## Verification (this task)
 
-<!-- From current task Acceptance criteria and plan §6 verification matrix -->
+<!-- From current task Acceptance criteria and bugfix-plan.md §7 verification matrix -->
 
 | Hook | Command / test | Task ID |
 |------|----------------|---------|
 | Unit | make test | [TASK_ID] |
-| Integration | … | … |
-| E2E | … | … |
+| Regression | … | … |
+| Repro verify | … | … |
 
 ---
 

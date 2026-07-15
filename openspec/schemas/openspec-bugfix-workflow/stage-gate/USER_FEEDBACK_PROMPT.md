@@ -32,8 +32,8 @@ Present artifact → Ask approval →
 8. Present scorecard + feedback addressed → Ask approval again
 ```
 
-**Exception — `specs.md`:** Rejection **exits the workflow**. Do **not** run this loop.
-See [Specs rejection — exit workflow](#specs-rejection--exit-workflow).
+**Exception — `bug-report.md`:** Rejection **exits the workflow**. Do **not** run this loop.
+See [Bug Report rejection — exit workflow](#bug-report-rejection--exit-workflow).
 
 ---
 
@@ -47,7 +47,7 @@ Do **not** edit any artifact file with status `done` in `openspec status --chang
 
 ## Step 2 — Load revision context
 
-Resolve `{schema_root}` (`openspec/schemas/openspec-agile-workflow/` installed, or `schemas/openspec-agile-workflow/` in distribution).
+Resolve `{schema_root}` (`openspec/schemas/openspec-bugfix-workflow/` installed, or `schemas/openspec-bugfix-workflow/` in distribution).
 
 Load mapping from `{schema_root}/stage-gate/artifact-eval-map.yaml` for the current artifact(s).
 
@@ -61,7 +61,7 @@ Load mapping from `{schema_root}/stage-gate/artifact-eval-map.yaml` for the curr
 | 6 | **Prior feedback rounds** | `openspec/changes/<change>/feedback_stage_artifacts/<artifact-id>/round-*.yaml` |
 | 7 | **Change inputs** | `inputs/jira.yaml`, `jira-spec.md` if present |
 
-For **joint gates** (`repo-assessment` + `constitution`): load both current artifacts and both templates; revise both in one round.
+For **joint gates** (`repro-verification` + related artifacts): load both current artifacts and both templates; revise both in one round.
 
 ---
 
@@ -111,7 +111,7 @@ openspec/changes/<change>/feedback_stage_artifacts/<artifact-id>/round-<N>.yaml
 Joint gate:
 
 ```
-openspec/changes/<change>/feedback_stage_artifacts/repo-assessment+constitution/round-<N>.yaml
+openspec/changes/<change>/feedback_stage_artifacts/repro-verification/round-<N>.yaml
 ```
 
 Use schema in `{schema_root}/feedback_stage_artifacts/README.md`. Include:
@@ -164,14 +164,9 @@ Ask:
 
 ---
 
-## Co-generated artifacts (repo-assessment + constitution)
+## Constitution (resolved as input)
 
-Single joint approval covers both. On reject:
-
-- One feedback loop revises **both** artifacts and **both** templates if needed
-- One shared round summary under `feedback_stage_artifacts/repo-assessment+constitution/`
-- Run eval gate separately for each artifact file
-- Treat `specs.md` and all earlier artifacts as immutable
+Constitution is resolved as an input **before** bugfix-planning — it is not a generated artifact in the bugfix workflow. See schema `constitution_md.lookup_order`. On reject of downstream artifacts, treat constitution and `bug-report.md` as immutable inputs.
 
 ---
 
@@ -184,13 +179,13 @@ the **current task only** — do not use this artifact feedback loop for per-tas
 
 ---
 
-## Specs rejection — exit workflow
+## Bug Report rejection — exit workflow
 
-When the user **rejects** `specs.md` at the approval gate:
+When the user **rejects** `bug-report.md` at the approval gate:
 
 1. **Do NOT** run the feedback loop above
-2. Optionally record reason in `feedback_stage_artifacts/specs/round-1.yaml`
-3. Present schema `exit_on_reject.specs.exit_message`
-4. **STOP** — do not create repo-assessment or downstream artifacts
+2. Optionally record reason in `feedback_stage_artifacts/bug-report/round-1.yaml`
+3. Present schema `exit_on_reject.bug-report.exit_message`
+4. **STOP** — do not create repro-verification or downstream artifacts
 
-The user must revise inputs and start fresh (`/opsx-new`) or delete specs and re-run `/opsx-continue`.
+The user must revise inputs and start fresh (`/opsx-new`) or delete bug-report and re-run `/opsx-continue`.

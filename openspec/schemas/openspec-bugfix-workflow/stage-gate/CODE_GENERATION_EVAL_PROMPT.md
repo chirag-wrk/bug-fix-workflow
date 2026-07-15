@@ -1,8 +1,8 @@
 # Code Generation Eval Gate — Forward workflow (`/opsx-apply` per task)
 
-Score **generated or modified code** in the fork working copy after each task's OAPE command (or manual agent work), **execute real verification and test commands**, **refine code until evals pass and tests pass**, then present for **user code approval**.
+Score **bug fix code** in the fork working copy after each task's OAPE command (or manual agent work), **execute real verification and test commands**, **refine code until evals pass and tests pass**, then present for **user code approval**.
 
-Paths below are **relative to the schema root** (`openspec/schemas/openspec-agile-workflow/` when installed).
+Paths below are **relative to the schema root** (`openspec/schemas/openspec-bugfix-workflow/` when installed).
 
 ## Mandatory per-task sequence
 
@@ -132,6 +132,10 @@ For each filtered case in `evals:`:
 | `must_not_violate_non_goals` | Non-goals from task/spec not violated |
 | `must_execute_verification` | Verification commands from step 2 all passed (exit code 0) |
 | `must_co_generate_tests` | All Tier 1 tasks (controller, API with webhooks/validation, manual Go with logic) produced `_test.go` files following the exemplar pattern defined in `agents.md` |
+| `must_address_root_cause` | Code change aligns with `rca-report.md` root cause statement |
+| `must_have_minimal_blast_radius` | Changes are limited to files identified in `bugfix-plan.md` |
+| `must_include_regression_test` | At least one regression test file is co-generated |
+| `must_not_change_unrelated_code` | No modifications to files outside the fix scope |
 
 **`must_pass_make_targets` is now enforced by real execution.** The agent MUST have
 actually run the listed make target in step 2 and it MUST have returned exit code 0.
@@ -257,7 +261,7 @@ If **any** eval case, verification command, or test execution fails, **do not as
 user approval yet**. Loop:
 
 1. Load failed case `prompt` + `assertions`, failed verification output, failed test output
-2. Load current task §4 payload and design-bundle.md
+2. Load current task §4 payload, design-bundle.md, and `rca_report` (rca-report.md)
 3. **Fix code (and test files if co-generated) in fork working copy only** — do not modify approved markdown artifacts
 4. Re-run verification commands (step 2)
 5. Re-score code-generation evals (step 3)
@@ -349,7 +353,7 @@ Ask (substitute task_id, task_title, verification/test results):
 
 > **Code eval score: {overall_score}%** ({N}/{M} cases pass).
 > **Verification: {V_pass}/{V_total} commands pass. Tests: {T_pass}/{T_total} pass.**
-> Approve the **code changes** for task {task_id} ({task_title}) and proceed to the next task?
+> Approve the **bug fix code changes** for task {task_id} ({task_title}) and proceed to the next task?
 > **(Approve / Reject with feedback)**
 
 - **Approve** → step 9

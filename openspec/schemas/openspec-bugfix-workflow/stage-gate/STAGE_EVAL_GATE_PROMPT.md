@@ -2,13 +2,13 @@
 
 Score and refine **change artifacts** using stage evals shipped with the schema package. **Do not** modify schema templates or `eval-generation/output-refined-templates/`.
 
-Paths below are **relative to the schema root** (`openspec/schemas/openspec-agile-workflow/` when installed, or `schemas/openspec-agile-workflow/` in this distribution repo).
+Paths below are **relative to the schema root** (`openspec/schemas/openspec-bugfix-workflow/` when installed, or `schemas/openspec-bugfix-workflow/` in this distribution repo).
 
 Read `stage-gate/artifact-eval-map.yaml` for artifact → eval file mapping.
 
 ## When this runs
 
-After **openspec-agile-workflow** creates one artifact (step 6 of `/opsx-continue`), **before** user approval:
+After **openspec-bugfix-workflow** creates one artifact (step 6 of `/opsx-continue`), **before** user approval:
 
 ```
 Generate v1 → Run evals → Refine artifact (v2+) → Present scorecard → User approval → STOP
@@ -69,23 +69,23 @@ openspec/changes/<change-name>/eval-results/<artifact-id>.yaml
 ```
 
 ```yaml
-artifact_id: plan
-artifact_path: openspec/changes/my-feature/plan.md
-stage: plan
-stage_eval_file: evals/plan_eval.yaml
+artifact_id: bugfix-plan
+artifact_path: openspec/changes/my-bugfix/bugfix-plan.md
+stage: bugfix-plan
+stage_eval_file: evals/bugfix-plan_eval.yaml
 scored_at: <ISO8601>
 overall_score: 72
 overall_pass: false
 cases:
-  - id: eval-r001-plan-001
+  - id: eval-r001-bugfix-plan-001
     score: 100
     pass: true
     failures: []
-  - id: eval-r002-plan-003
+  - id: eval-r002-bugfix-plan-003
     score: 45
     pass: false
     failures:
-      - "must_mention: tamper — not found in §6 verification matrix"
+      - "must_mention: root cause mitigation — not found in §4 fix strategy"
 ```
 
 ## Step 3 — Refine artifact (mandatory if any case fails)
