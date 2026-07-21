@@ -12,51 +12,42 @@ Write one file per feedback round:
 openspec/changes/<change-name>/feedback_stage_artifacts/<artifact-id>/round-<N>.yaml
 ```
 
-Co-generated gates (`repo-assessment` + `constitution`) use one shared round file per rejection:
-
-```
-openspec/changes/<change-name>/feedback_stage_artifacts/repo-assessment+constitution/round-<N>.yaml
-```
-
 ## Round file schema
 
 ```yaml
 round: 1
-artifact_ids: [repo-assessment, constitution]
+artifact_ids: [repro-verification]
 timestamp: <ISO8601>
 user_feedback: |
   Verbatim rejection feedback from the user.
 
 context:
   prior_artifacts_read_only:
-    - openspec/changes/<change>/specs.md
+    - openspec/changes/<change>/bug-report.md
   current_artifacts:
-    - openspec/changes/<change>/repo-assessment.md
-    - openspec/changes/<change>/constitution.md
-  template: templates/repo-assessment-template.md
+    - openspec/changes/<change>/repro-verification-report.md
+  template: templates/repro-verification-template.md
 
 template_update:
-  required: true
-  path: templates/repo-assessment-template.md
+  required: false
+  path: templates/repro-verification-template.md
   summary: |
-    Added In scope vs out of scope section to template skeleton.
+    Optional — only when feedback requires a durable template change.
 
 artifact_regeneration:
   paths:
-    - openspec/changes/<change>/repo-assessment.md
-    - openspec/changes/<change>/constitution.md
+    - openspec/changes/<change>/repro-verification-report.md
   summary: |
-    Reframed §0 against RFE first-release scope; added scope table.
+    Regenerated repro steps with captured failure signature.
 
 eval_gate:
   rerun: true
-  results_path: openspec/changes/<change>/eval-results/repo-assessment.yaml
+  results_path: openspec/changes/<change>/eval-results/repro-verification.yaml
   overall_score: 88
   overall_pass: true
 
 feedback_addressed:
-  - "User: unclear TP scope → Added In scope / Out of scope table in §0"
-  - "User: delta/hardening framing → Reframed against RFE recommendation"
+  - "User: missing pod logs → Added operator log excerpts per step"
 ```
 
 ## This directory

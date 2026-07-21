@@ -14,7 +14,8 @@ You will receive some combination of:
 - bugfix-plan.md (fix approach, affected components, regression strategy)
 - bug-report.md (bug details, ARD from linked PRs)
 - repro-verification-report.md (optional; reproduction evidence and logs)
-- agents.md (optional; SME-defined execution agent roster + routing rules)
+- agents.md (REQUIRED; SME-defined execution agent roster + routing rules —
+  openspec/inputs/agents.md, else target repo AGENTS.md/agents.md)
 
 Precedence on conflicts:
 1) constitution.md
@@ -24,14 +25,11 @@ Precedence on conflicts:
 5) agents.md (routing)
 
 ## agents.md policy
-- If agents.md is PROVIDED: every task MUST use an `AssignedAgent` value that exists in agents.md
+- agents.md is REQUIRED. Resolve via schema agents_md.lookup_order before authoring tasks.
+- Every task MUST use an `AssignedAgent` value that exists in agents.md
   (use exact IDs/strings from that document).
-- If agents.md is NOT PROVIDED: route tasks using the provisional agent IDs below and mark the
-  backlog header field `AgentRoutingMode: PROVISIONAL`.
-
-Provisional agent IDs (use exactly these strings):
-`API_Agent`, `OperatorController_Agent`, `ManifestsBindata_Agent`, `WebhookTLS_Agent`,
-`RBACSecurity_Agent`, `OLMRelease_Agent`, `Testing_Agent`, `Docs_Agent`.
+- If agents.md cannot be resolved, STOP and ask the user — do not invent agent IDs
+  and do not use AgentRoutingMode PROVISIONAL.
 
 ## Single-phase generation
 
@@ -156,7 +154,7 @@ Before finalizing, verify:
 - [ ] AgentRoutingMode matches constitution.md (PROVIDED vs PROVISIONAL)
 - [ ] §3 manifest row count equals §4 payload subsection count (every ID covered)
 - [ ] §2 linear order is a valid topological sort of §1 DAG
-- [ ] Assigned Agent values exist in agents.md (when PROVIDED) or match provisional IDs exactly
+- [ ] Assigned Agent values exist in agents.md (REQUIRED — exact IDs from resolved agents.md)
 - [ ] Target file(s) in each payload trace to rca-report.md or bugfix-plan.md (marked PARTIAL if uncertain)
 - [ ] §5 present with Retry Boundaries, Merge Conflict Hotspots, and Open Questions
 - [ ] No truncated mid-task payloads; document ends cleanly after §5
@@ -199,9 +197,7 @@ graph TD
 | T1_1 | [TITLE] | [AGENT_ID] | none | No | [1-8] | [Low/Med/High] |
 | T1_2 | [TITLE] | [AGENT_ID] | T1_1 | No | [1-8] | [Low/Med/High] |
 
-Provisional agent IDs when AgentRoutingMode is PROVISIONAL:
-`API_Agent`, `OperatorController_Agent`, `ManifestsBindata_Agent`, `WebhookTLS_Agent`,
-`RBACSecurity_Agent`, `OLMRelease_Agent`, `Testing_Agent`, `Docs_Agent`
+Assigned Agent values MUST match IDs from the resolved agents.md.
 
 ### § 4. Task Specifications (Payloads)
 
@@ -246,7 +242,7 @@ inputs:
   bugfix_plan_md: PROVIDED
   bug_report_md: PROVIDED
   repro_verification_report_md: PROVIDED | NOT_PROVIDED
-  agents_md: PROVIDED | NOT_PROVIDED
+  agents_md: PROVIDED  # REQUIRED — STOP if unresolved
 
 constitution.md:
 <<<PASTE>>>
@@ -264,14 +260,14 @@ repro-verification-report.md:
 <<<PASTE OR NOT_PROVIDED>>>
 
 agents.md:
-<<<PASTE OR NOT_PROVIDED>>>
+<<<PASTE — REQUIRED; openspec/inputs/agents.md or target repo AGENTS.md/agents.md>>>
 
 instructions:
 Generate tasks.md / Execution Backlog exactly per the system schema.
 - Tasks must be chronological via section 2 (Linear Execution Order) AND consistent with the DAG.
 - Every task must include Depends On + Parallel OK + Complexity + Risk.
-- Read AgentRoutingMode from constitution.md; set backlog header to match (PROVIDED or PROVISIONAL).
-- If agents_md is NOT_PROVIDED AND constitution says PROVISIONAL, use provisional agent IDs only.
+- Read AgentRoutingMode from constitution.md; set backlog header to match (must be PROVIDED when agents.md resolved).
+- Assigned Agent values MUST match IDs from the resolved agents.md — do not use provisional IDs.
 - Pull Target file(s) primarily from rca-report.md; if NOT_PROVIDED, derive only from
   bugfix-plan.md and mark Evidence: PARTIAL where uncertain.
 - Include regression test co-generation in §4 Acceptance criteria for bug fix tasks (not separate tasks).

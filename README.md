@@ -10,7 +10,7 @@ Custom [OpenSpec](https://github.com/Fission-AI/OpenSpec) schema for **gated, Ji
 
 ```bash
 rm -rf /tmp/openspec-workflow
-git clone -b openspec-operator-generic https://github.com/sujkini/openspec.git /tmp/openspec-workflow
+git clone -b Version-1 https://github.com/chirag-wrk/bug-fix-workflow.git /tmp/openspec-workflow
 /tmp/openspec-workflow/install.sh /path/to/your-operator-repo
 ```
 
@@ -26,10 +26,12 @@ flags:
   codegen_mode: ai-helpers   # or: direct
 ```
 
-| Mode | When to use | What `/opsx-apply` does |
-|------|-------------|-------------------------|
-| **`ai-helpers`** (default) | API/controller/e2e work that benefits from specialized OAPE Cursor commands and a code eval gate | design-bundle → OAPE command → verify → code eval → refine → approve |
-| **`direct`** | Straightforward fix tasks; simpler/faster path | agent reads context → FILE OPERATIONS → verify → approve (no OAPE, no code eval) |
+
+| Mode                       | When to use                                                                                      | What `/opsx-apply` does                                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `**ai-helpers**` (default) | API/controller/e2e work that benefits from specialized OAPE Cursor commands and a code eval gate | design-bundle → OAPE command → verify → code eval → refine → approve             |
+| `**direct**`               | Straightforward fix tasks; simpler/faster path                                                   | agent reads context → FILE OPERATIONS → verify → approve (no OAPE, no code eval) |
+
 
 Change the flag anytime; `/opsx-apply` reads it on each invocation. Details below under [Configuration](#configuration-openspecconfigyaml).
 
@@ -40,7 +42,7 @@ cd /path/to/your-operator-repo
 ./dashboard/start.sh
 ```
 
-Installs deps on first run, starts the FastAPI backend (port 8000) and React frontend (port 5173). Open http://localhost:5173. See `dashboard/README.md` for details.
+Installs deps on first run, starts the FastAPI backend (port 8000) and React frontend (port 5173). Open [http://localhost:5173](http://localhost:5173). See `dashboard/README.md` for details.
 
 ### 4. Restart Cursor
 
@@ -69,21 +71,24 @@ bug-validation.json → bug-report.md → repro-verification-report.md → rca-r
 
 After installation, configure two files in `openspec/inputs/`:
 
-| File | What to define |
-|------|---------------|
-| **`openspec/inputs/agents.md`** | Agent routing, repository architecture, test patterns, verification matrix |
-| **`openspec/inputs/constitution.md`** | Coding guardrails, CI gates, governance rules |
+
+| File                                  | What to define                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| `**openspec/inputs/agents.md`**       | Agent routing, repository architecture, test patterns, verification matrix |
+| `**openspec/inputs/constitution.md`** | Coding guardrails, CI gates, governance rules                              |
+
 
 These are the **only operator-specific files**. Everything else is generic.
 
 Your `agents.md` should define:
+
 - **Repository layout** — directory structure, key packages
 - **Architecture patterns** — controller frameworks, reconciliation flow
 - **Test exemplar** — how tests are structured (mocks, table-driven patterns, file naming)
 - **Execution agent routing** — agent IDs and which paths/packages they own
 - **Per-task verification matrix** — `make` targets and `go test` commands per task type
 
-The bundled `agents.md` ships with a reference. Replace it entirely with your operator's documentation.
+Place your operator's `agents.md` at `openspec/inputs/agents.md`, or ensure the target repo has `AGENTS.md` / `agents.md`. Without it, Repro Verification and later stages cannot start.
 
 ---
 
@@ -109,6 +114,7 @@ Primary input: **Jira Bug ticket key** (stored in `inputs/jira.yaml`). Target Gi
 ```
 
 Each artifact is:
+
 1. Generated from the template
 2. Evaluated against stage evals
 3. Refined if needed
@@ -125,6 +131,7 @@ If you **reject**, the agent refines and re-runs evals until you approve (except
 The implementation flow depends on `codegen_mode` in `openspec/config.yaml`:
 
 **ai-helpers mode** (`codegen_mode: ai-helpers`):
+
 1. Compose `design-bundle.md` scoped to that task
 2. Resolve one OAPE command (or manual work)
 3. Run in fork working copy (or project cwd in working-folder mode)
@@ -134,6 +141,7 @@ The implementation flow depends on `codegen_mode` in `openspec/config.yaml`:
 7. On approve: mark task complete, next task
 
 **direct mode** (`codegen_mode: direct`):
+
 1. Read context files (agents.md, constitution.md, bug report, RCA, plan)
 2. Implement code directly via FILE OPERATIONS
 3. Verify against acceptance criteria
@@ -152,12 +160,14 @@ The implementation flow depends on `codegen_mode` in `openspec/config.yaml`:
 
 Repro Verification confirms the bug is reproducible and captures a failure signature for RCA. It runs in Cursor agent chat against the operator repo when possible.
 
-| Execution mode | When to use | Log source to record |
-|----------------|-------------|----------------------|
-| **Repo-local / Cursor chat** | Unit/integration tests, envtest, make targets, or code-path checks confirm the signature | `repo-local tests/envtest` |
-| **Must-gather / user logs** | No live cluster; logs in workspace match the reported failure | `must-gather` or `user-provided logs` |
-| **Live cluster** | kubeconfig/cluster access available and repo-local evidence is insufficient | `live cluster` |
-| **Partial** | Real OpenShift cluster (or other env) is required but unavailable | Document gap in Assessment Limitations |
+
+| Execution mode               | When to use                                                                              | Log source to record                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| **Repo-local / Cursor chat** | Unit/integration tests, envtest, make targets, or code-path checks confirm the signature | `repo-local tests/envtest`             |
+| **Must-gather / user logs**  | No live cluster; logs in workspace match the reported failure                            | `must-gather` or `user-provided logs`  |
+| **Live cluster**             | kubeconfig/cluster access available and repo-local evidence is insufficient              | `live cluster`                         |
+| **Partial**                  | Real OpenShift cluster (or other env) is required but unavailable                        | Document gap in Assessment Limitations |
+
 
 **Practical rule:** If the bug reproduces via tests/envtest or is confirmed from must-gather, complete the whole Repro Verification stage in Cursor chat. If it needs a real OpenShift cluster and you do not have access, mark **Partial** and document that limitation — do not pretend live steps ran.
 
@@ -172,6 +182,7 @@ Provide must-gather, operator logs, or cluster access before `/opsx-continue` fo
 Use when your Cursor workspace IS the operator repo.
 
 When prompted for target repo, tell the agent: **"use this as the working directory"**
+
 - Code changes happen directly in your working directory
 - No fork URL needed, no draft PR
 - Ideal for repo-local repro (tests/envtest) in the same chat
@@ -179,6 +190,7 @@ When prompted for target repo, tell the agent: **"use this as the working direct
 ### Mode B: Fork mode (draft PR)
 
 When prompted, provide:
+
 - **Target repo URL** — before Repro Verification
 - **Fork repo URL** — before `/opsx-apply`
 
@@ -190,30 +202,36 @@ The agent clones your fork, implements task-by-task, and opens a draft PR.
 
 ### Forward workflow
 
-| Command | Purpose |
-|---------|---------|
-| `/opsx-new PROJ-123` | Start a bug-fix change from a Jira Bug key |
-| `/opsx-continue` | Create next artifact; eval gate; approval |
-| `/opsx-apply` | Implement tasks — one at a time, approval after each |
-| `/opsx-archive` | Archive a completed change |
-| `/opsx-explore` | Explore ideas without creating artifacts |
+
+| Command              | Purpose                                              |
+| -------------------- | ---------------------------------------------------- |
+| `/opsx-new PROJ-123` | Start a bug-fix change from a Jira Bug key           |
+| `/opsx-continue`     | Create next artifact; eval gate; approval            |
+| `/opsx-apply`        | Implement tasks — one at a time, approval after each |
+| `/opsx-archive`      | Archive a completed change                           |
+| `/opsx-explore`      | Explore ideas without creating artifacts             |
+
 
 ### OAPE commands (ai-helpers mode only, during `/opsx-apply`)
 
-| Command | When |
-|---------|------|
-| `/oape:api-generate` | API_Agent task |
-| `/oape:api-generate-tests` | API_Agent verification task |
-| `/oape:api-implement` | OperatorController_Agent task |
-| `/oape:e2e-generate` | E2E / Testing_Agent task |
+
+| Command                    | When                          |
+| -------------------------- | ----------------------------- |
+| `/oape:api-generate`       | API_Agent task                |
+| `/oape:api-generate-tests` | API_Agent verification task   |
+| `/oape:api-implement`      | OperatorController_Agent task |
+| `/oape:e2e-generate`       | E2E / Testing_Agent task      |
+
 
 These commands are **not used** when `codegen_mode: direct`.
 
 ### Retrospective eval loop
 
-| Command | Purpose |
-|---------|---------|
+
+| Command      | Purpose                                              |
+| ------------ | ---------------------------------------------------- |
 | `/eval-loop` | Improve evals from a completed feature/bugfix bundle |
+
 
 ---
 
@@ -228,17 +246,19 @@ flags:
   exit_on_all_tasks_complete: true
 ```
 
-| Flag | Default | What it does |
-|------|---------|--------------|
-| `codegen_mode` | `ai-helpers` | Code generation strategy: `ai-helpers` (OAPE commands + code eval gate) or `direct` (plain agent, no OAPE, no eval gate) |
-| `max_feedback_rounds` | 3 | Max rejection + refinement loops per artifact before halting |
-| `exit_on_all_tasks_complete` | true | Auto-exit implementation when all tasks marked `[x]` |
+
+| Flag                         | Default      | What it does                                                                                                             |
+| ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `codegen_mode`               | `ai-helpers` | Code generation strategy: `ai-helpers` (OAPE commands + code eval gate) or `direct` (plain agent, no OAPE, no eval gate) |
+| `max_feedback_rounds`        | 3            | Max rejection + refinement loops per artifact before halting                                                             |
+| `exit_on_all_tasks_complete` | true         | Auto-exit implementation when all tasks marked `[x]`                                                                     |
+
 
 ### Code generation modes
 
-**`ai-helpers`** — For each task, composes a `design-bundle.md`, routes to specialized OAPE Cursor commands (`api-generate`, `api-implement`, `e2e-generate`), scores generated code via a code-generation eval gate, refines until evals pass, then asks for user approval.
+`**ai-helpers**` — For each task, composes a `design-bundle.md`, routes to specialized OAPE Cursor commands (`api-generate`, `api-implement`, `e2e-generate`), scores generated code via a code-generation eval gate, refines until evals pass, then asks for user approval.
 
-**`direct`** — The Cursor agent reads context files directly, implements code via FILE OPERATIONS, verifies against acceptance criteria, and asks for user approval. No OAPE commands, no design bundles, no code eval gate. Simpler and faster for straightforward fix tasks.
+`**direct**` — The Cursor agent reads context files directly, implements code via FILE OPERATIONS, verifies against acceptance criteria, and asks for user approval. No OAPE commands, no design bundles, no code eval gate. Simpler and faster for straightforward fix tasks.
 
 ---
 
@@ -250,17 +270,19 @@ The eval loop is a **retrospective improvement** tool. After a bug fix (or featu
 
 Fill `eval-generation/input/feature-bundle.yaml` with data from a **completed change**:
 
-| Field | What to paste |
-|-------|---------------|
-| `feature_name` | Change / bug name |
-| `epic_key` | Jira epic key |
-| `target_repo` | Target repository URL |
-| `enhancement_proposal` | Full EP/ARD content |
-| `jira_epic` | Jira epic export |
-| `repo_state` | Pre-change repo state |
-| `user_stories` | User stories linked to the epic |
-| `repo_prs` | PR links and key diffs |
-| `bugs` | Bug list with root causes |
+
+| Field                  | What to paste                   |
+| ---------------------- | ------------------------------- |
+| `feature_name`         | Change / bug name               |
+| `epic_key`             | Jira epic key                   |
+| `target_repo`          | Target repository URL           |
+| `enhancement_proposal` | Full EP/ARD content             |
+| `jira_epic`            | Jira epic export                |
+| `repo_state`           | Pre-change repo state           |
+| `user_stories`         | User stories linked to the epic |
+| `repo_prs`             | PR links and key diffs          |
+| `bugs`                 | Bug list with root causes       |
+
 
 ### Step 2: Run the eval loop
 
@@ -314,30 +336,34 @@ Update `eval-generation/input/feature-bundle.yaml` with the next completed chang
 bug-validation → bug-report → repro-verification → rca → bugfix-plan → tasks → implementation → archive
 ```
 
-| Stage | Artifacts | Purpose |
-|-------|-----------|---------|
-| **Bug Triage** | `bug-validation.json`, `bug-report.md` | Validate Jira bug completeness; structure bug context, ARD, and original PRs |
-| **Repro Verification** | `repro-verification-report.md` | Confirm reproducibility (repo-local tests/envtest, must-gather, or live cluster); capture failure signature |
-| **Root Cause Analysis** | `rca-report.md` | Trace failure path from signature to root cause |
-| **Bug Fix Planning** | `bugfix-plan.md` | Single-phase fix plan, regression strategy, rollback |
-| **Constitution (input)** | `constitution.md` (resolved) | Non-negotiable guardrails (resolved before planning) |
-| **Task creation** | `tasks.md` | Executable backlog: code fix, regression test, verification |
-| **Implementation** | code + `implementation-report.md` | Task-by-task execution with per-task approval (ai-helpers or direct mode) |
-| **Archive** | archived change | Close out |
+
+| Stage                    | Artifacts                              | Purpose                                                                                                     |
+| ------------------------ | -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Bug Triage**           | `bug-validation.json`, `bug-report.md` | Validate Jira bug completeness; structure bug context, ARD, and original PRs                                |
+| **Repro Verification**   | `repro-verification-report.md`         | Confirm reproducibility (repo-local tests/envtest, must-gather, or live cluster); capture failure signature |
+| **Root Cause Analysis**  | `rca-report.md`                        | Trace failure path from signature to root cause                                                             |
+| **Bug Fix Planning**     | `bugfix-plan.md`                       | Single-phase fix plan, regression strategy, rollback                                                        |
+| **Constitution (input)** | `constitution.md` (resolved)           | Non-negotiable guardrails (resolved before planning)                                                        |
+| **Task creation**        | `tasks.md`                             | Executable backlog: code fix, regression test, verification                                                 |
+| **Implementation**       | code + `implementation-report.md`      | Task-by-task execution with per-task approval (ai-helpers or direct mode)                                   |
+| **Archive**              | archived change                        | Close out                                                                                                   |
+
 
 ---
 
 ## Prerequisites
 
-| Requirement | Notes |
-|-------------|-------|
-| [Node.js](https://nodejs.org/) | For OpenSpec CLI installation |
-| [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec) | Installed by `install.sh` |
-| [Cursor](https://cursor.com) | Slash commands load from `.cursor/commands/` |
-| Jira access | Bug ticket key at `/opsx-new`; content via MCP or paste |
-| Target GitHub repo | URL before **Repro Verification**; or use working-folder mode |
-| Fork GitHub repo | URL before `/opsx-apply`; skip in working-folder mode |
-| Logs / cluster (conditional) | Must-gather, user logs, or cluster access when repo-local repro is insufficient |
+
+| Requirement                                            | Notes                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| [Node.js](https://nodejs.org/)                         | For OpenSpec CLI installation                                                   |
+| [OpenSpec CLI](https://github.com/Fission-AI/OpenSpec) | Installed by `install.sh`                                                       |
+| [Cursor](https://cursor.com)                           | Slash commands load from `.cursor/commands/`                                    |
+| Jira access                                            | Bug ticket key at `/opsx-new`; content via MCP or paste                         |
+| Target GitHub repo                                     | URL before **Repro Verification**; or use working-folder mode                   |
+| Fork GitHub repo                                       | URL before `/opsx-apply`; skip in working-folder mode                           |
+| Logs / cluster (conditional)                           | Must-gather, user logs, or cluster access when repo-local repro is insufficient |
+
 
 ---
 
@@ -382,10 +408,15 @@ bug-validation → bug-report → repro-verification → rca → bugfix-plan →
 
 ## agents.md Resolution (lookup order)
 
-1. `{target_repo}/AGENTS.md`
-2. `{target_repo}/agents.md`
-3. `openspec/inputs/agents.md`
-4. `{schema_root}/agents.md` (bundled fallback)
+**Required** before Repro Verification (and all later stages).
+
+1. `openspec/inputs/agents.md` (preferred)
+2. `openspec/changes/<change>/inputs/AGENTS.md` (persisted copy)
+3. `{target_repo}/AGENTS.md`
+4. `{target_repo}/agents.md`
+
+If `agents.md` is not in the inputs folder, it **must** exist in the target repository.
+Do not proceed with provisional agent IDs — stop and ask the user to provide the file.
 
 ## constitution.md Resolution (lookup order)
 

@@ -27,3 +27,4 @@ dashboard/.venv/
 dashboard/web/node_modules/
 dashboard/web/dist/
 dashboard/web/tsconfig.tsbuildinfo
+# ─── OpenSpec runtime artifacts (never commit) ───

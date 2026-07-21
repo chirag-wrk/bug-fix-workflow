@@ -19,47 +19,45 @@ templates_dir: templates
 # ---------------------------------------------------------------------------
 agents_md:
   description:
-    SME-defined execution agent roster and routing rules from the target repository.
-    Used for repo verification, RCA component mapping, bug fix planning, task
-    routing, and implementation. Not used during Bug Triage.
+    SME-defined execution agent roster and routing rules. Required for repro
+    verification and all downstream stages. Prefer openspec/inputs/agents.md;
+    if absent there, AGENTS.md/agents.md MUST exist in the target repository.
   canonical_file:
     path: agents.md
-    path_relative_to_schema: agents.md
+    path_relative_to_inputs: openspec/inputs/agents.md
     description: >-
-      Operator-specific agent roster and execution routing. Shipped inside the
-      schema package at openspec/schemas/openspec-agile-workflow/agents.md
-      (installed by install.sh from distribution repo root agents.md).
-      Customize this file for your operator.
+      Operator-specific agent roster, architecture mapping, and execution
+      routing. Place a copy at openspec/inputs/agents.md, or ensure the target
+      repo contains AGENTS.md / agents.md.
     use_when: >-
-      The target repo has no AGENTS.md/agents.md and change inputs do not
-      override with a local copy. Falls back to the bundled schema copy.
+      Required before repro-verification. Resolve from openspec/inputs/ first;
+      if missing, require AGENTS.md/agents.md in the target repo.
   used_in_stages:
     - id: repro-verification
-      required: false
+      required: true
       when: repro-verification-report authoring
       effect: >-
-        If found, repro-verification notes agent IDs for downstream use.
-        AgentRoutingMode is set in the pre-approved constitution.md input.
+        agents.md provides operator architecture and component mapping for
+        repro execution. AgentRoutingMode is set in the pre-approved
+        constitution.md input and must align with resolved agents.md.
     - id: root-cause-analysis
-      required: false
+      required: true
       when: rca-report authoring
       effect: >-
-        Map affected components to concrete agent IDs from AGENTS.md when provided;
-        helps identify which subsystem introduced the regression.
+        Map affected components to concrete agent IDs / subsystems from
+        agents.md; identify which subsystem introduced the regression.
     - id: bugfix-planning
-      required: false
+      required: true
       when: bugfix-plan.md authoring
       effect: >-
-        Map fix approach to concrete agent IDs from AGENTS.md when provided;
-        otherwise use provisional taxonomy and label it in bugfix-plan.md.
+        Map fix approach to concrete agent IDs/capabilities defined in agents.md.
     - id: bugfix-task-creation
-      required: false
+      required: true
       when: tasks.md authoring (§3 manifest, §4 payloads)
       effect: >-
-        Assigned Agent must match AGENTS.md IDs when AgentRoutingMode is PROVIDED;
-        otherwise use provisional agent IDs from constitution/tasks template.
+        Assigned Agent must match agents.md IDs (AgentRoutingMode PROVIDED).
     - id: bugfix-implementation
-      required: false
+      required: true
       when: task-by-task bug fix code generation
       effect: >-
         ai-helpers mode (codegen_mode = ai-helpers): Route Assigned Agent values
@@ -72,18 +70,20 @@ agents_md:
   not_used_in_stages:
     - bug-triage
   lookup_order:
+    - "openspec/inputs/agents.md"
+    - "openspec/changes/<change>/inputs/AGENTS.md"
+    - "openspec/changes/<change>/inputs/agents.md"
     - "{target_repo}/AGENTS.md"
     - "{target_repo}/agents.md"
-    - "openspec/inputs/agents.md"
-    - "{schema_root}/agents.md"
   when_missing: >-
-    Before starting repro-verification, RCA, plan, or tasks — resolve agents.md
-    using lookup_order. Check the target repo first, then openspec/inputs/ folder,
-    then schema root. Persist a copy to openspec/changes/<change>/inputs/AGENTS.md
-    when first resolved so downstream artifacts reference a stable path. If still
-    absent, ask the user once to provide AGENTS.md. Do not invent agent IDs. If the
-    user declines, proceed with AgentRoutingMode PROVISIONAL and document in
-    bugfix-plan.md and tasks.md.
+    Before starting repro-verification (and any later stage that uses agents.md),
+    resolve agents.md using lookup_order. Prefer openspec/inputs/agents.md. If it
+    is not in the inputs folder, AGENTS.md or agents.md is REQUIRED in the target
+    repository. Persist a copy to openspec/changes/<change>/inputs/AGENTS.md when
+    first resolved so downstream artifacts reference a stable path. If still
+    absent, STOP and ask the user to provide agents.md (place it under
+    openspec/inputs/ or add it to the target repo). Do not invent agent IDs.
+    Do not proceed with AgentRoutingMode PROVISIONAL.
 
 # ---------------------------------------------------------------------------
 # constitution_md — pre-approved constitution provided as input
@@ -285,13 +285,13 @@ rca_analysis:
     - ard-context.md (original PR intent)
     - pr-diffs/ (original code changes)
     - repo-assessment.md or code inspection (current state)
-    - agents.md (component mapping)
+    - agents.md (REQUIRED — component mapping; see agents_md)
   analysis_approach:
     - Trace failure path from symptom to root cause using logs
     - Compare actual behavior vs ARD intent from original PRs
     - Compare current code state vs original PR diffs
     - Identify the specific code path, condition, or interaction causing the bug
-    - Map affected components to AGENTS.md subsystems
+    - Map affected components to agents.md subsystems
     - Distinguish root cause from symptoms and secondary effects
   output: >-
     rca-report.md containing: failure path analysis, ARD intent vs actual
@@ -366,7 +366,9 @@ working_folder_repo:
       origin when possible; otherwise record working_folder_path and proceed with
       local analysis.
     agents_md: >-
-      Resolve AGENTS.md from the working folder first, then change inputs/.
+      Resolve agents.md via schema agents_md.lookup_order: prefer
+      openspec/inputs/agents.md; if absent, require AGENTS.md/agents.md in the
+      working folder (target repo). STOP if still missing.
   implementation:
     working_copy: >-
       Same as working_folder_path / project root. All code edits (OAPE commands
@@ -964,7 +966,7 @@ workflow:
     inputs:
       - bug-report.md
       - GitHub repository (inputs/jira.yaml target_repo — required; see schema target_repo)
-      - AGENTS.md (optional — ask user if missing; see agents_md.when_missing)
+      - agents.md (REQUIRED — openspec/inputs/agents.md, else target repo AGENTS.md/agents.md; see agents_md)
       - User-provided logs, must-gather data, or cluster access
     outputs:
       - repro-verification-report.md
@@ -982,7 +984,7 @@ workflow:
       - repro-verification-report.md
       - ard-context.md (ARD from original PRs)
       - pr-diffs/ (original development PR diffs)
-      - AGENTS.md (optional — for component mapping)
+      - agents.md (REQUIRED — component mapping; see agents_md)
     outputs:
       - rca-report.md
     gate: user_approval
@@ -1001,7 +1003,7 @@ workflow:
       - repro-verification-report.md
       - rca-report.md
       - constitution.md (input — resolved via constitution_md.lookup_order; see schema constitution_md)
-      - AGENTS.md (optional — ask user if missing; see agents_md.when_missing)
+      - agents.md (REQUIRED — see agents_md)
       - bug-validation.json
     outputs:
       - bugfix-plan.md
@@ -1019,7 +1021,7 @@ workflow:
       - constitution.md (input — resolved via constitution_md.lookup_order)
       - rca-report.md
       - bugfix-plan.md
-      - AGENTS.md (optional — ask user if missing; see agents_md.when_missing)
+      - agents.md (REQUIRED — see agents_md)
     outputs:
       - tasks.md
     gate: user_approval
@@ -1145,12 +1147,14 @@ artifacts:
       ## Inputs
       - Approved bug-report.md (steps to reproduce, expected/actual behavior)
       - Target repository (code inspection, git metadata)
-      - agents.md (INPUT — resolved via lookup; contains operator architecture and component mapping)
+      - agents.md (REQUIRED INPUT — openspec/inputs/agents.md, else target repo AGENTS.md/agents.md)
       - User-provided logs, must-gather data, or environment traces
 
       ## Process
       0. Resolve repo target (REQUIRED — see schema target_repo and working_folder_repo).
-      1. Resolve agents.md: check target repo, then schema inputs/.
+      1. Resolve agents.md (REQUIRED — see schema agents_md.lookup_order):
+         prefer openspec/inputs/agents.md; if absent, require AGENTS.md/agents.md
+         in the target repo. STOP if still missing (do not invent agent IDs).
       2. Execute reproduction steps as documented in bug-report.md.
          Prefer Cursor agent chat / repo-local reproduction (tests, envtest,
          make targets) or must-gather / user-provided logs when that confirms
@@ -1193,7 +1197,7 @@ artifacts:
       - Approved repro-verification-report.md (logs, failure signature)
       - ard-context.md (original PR intent and architecture decisions)
       - pr-diffs/ (original development PR diffs)
-      - agents.md (optional — for component mapping)
+      - agents.md (REQUIRED — component mapping; see schema agents_md)
       - Target repository (current code state for comparison)
 
       ## Process
@@ -1202,7 +1206,7 @@ artifacts:
       3. Compare current code state vs original PR diffs to identify where behavior diverged.
       4. Identify the root cause — the specific code path, condition, or interaction causing the bug.
          Distinguish root cause from symptoms and secondary effects.
-      5. Map affected components to AGENTS.md subsystems when available.
+      5. Map affected components to agents.md subsystems.
       6. Validate ARD/PR cross-references are consistent.
       7. Recommend the fix area and approach (without writing code).
 
@@ -1237,10 +1241,9 @@ artifacts:
         - bug-report.md
         - rca-report.md
         - constitution.md (INPUT — resolved via schema constitution_md.lookup_order)
+        - agents.md (REQUIRED — see schema agents_md.lookup_order)
       optional:
         - repro-verification-report.md
-        - AGENTS.md
-        - agents.md
         - bug-validation.json
     instruction: |
       Create bugfix-plan.md — the Bug Fix Plan for the identified root cause.
@@ -1250,7 +1253,7 @@ artifacts:
       2. rca-report.md (root cause analysis findings)
       3. bug-report.md (bug details, ARD context, PR references)
       4. repro-verification-report.md (reproduction evidence, failure signature)
-      5. AGENTS.md (optional — agent routing)
+      5. agents.md (REQUIRED — agent routing; see schema agents_md)
 
       ## Process
       0. Resolve constitution.md (see schema constitution_md.lookup_order).
@@ -1292,10 +1295,9 @@ artifacts:
         - constitution.md
         - rca-report.md
         - bugfix-plan.md
+        - agents.md (REQUIRED — see schema agents_md.lookup_order)
       optional:
         - repro-verification-report.md
-        - AGENTS.md
-        - agents.md
     instruction: |
       Create tasks.md — a Bug Fix Execution Backlog for downstream code generation.
 
@@ -1312,7 +1314,7 @@ artifacts:
       2. rca-report.md (root cause findings)
       3. bugfix-plan.md (fix approach and target files)
       4. bug-report.md (bug details)
-      5. agents.md (routing)
+      5. agents.md (REQUIRED — routing)
 
       ## Required output structure (§0–§5)
       - §0 Input coverage checklist — map RCA findings and fix approach to Task IDs
@@ -1328,7 +1330,7 @@ artifacts:
       Header fields: Bug, AgentRoutingMode (from constitution), ConstitutionVersion.
 
       ## Agent routing
-      Same as feature workflow — use AGENTS.md IDs or provisional IDs.
+      Assigned Agent values MUST match IDs from the resolved agents.md.
 
       ## Hard boundaries
       - Do NOT write production code, patches, or diffs.
@@ -1380,13 +1382,12 @@ artifacts:
         - bug-report.md
         - rca-report.md
         - bugfix-plan.md
+        - agents.md (REQUIRED — see schema agents_md.lookup_order)
         - forked repository URL (inputs/jira.yaml fork_repo_url — ask user if missing;
           **skip when use_working_folder_as_repo is true**)
       optional:
         - repro-verification-report.md
         - target repository (inputs/jira.yaml target_repo — upstream reference)
-        - AGENTS.md
-        - agents.md
     instruction: |
       You are the Bug Fix Implementation Orchestrator.
 
@@ -1537,7 +1538,8 @@ apply:
     - repro-verification
     - rca
     - constitution.md (input — resolved via constitution_md.lookup_order)
-    - AGENTS.md
+  required_context:
+    - agents.md (REQUIRED — openspec/inputs/ first, else target repo; see agents_md)
   fork_repo: >-
     {fork_repo_url from inputs/jira.yaml — ask at stage start if missing in default
     mode; skip when use_working_folder_as_repo is true — use project cwd instead}

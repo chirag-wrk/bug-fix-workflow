@@ -62,7 +62,7 @@ graph TD
 - [ ] AgentRoutingMode matches constitution.md (PROVIDED vs PROVISIONAL)
 - [ ] §3 manifest row count equals §4 payload subsection count (every ID covered)
 - [ ] §2 linear order is a valid topological sort of §1 DAG
-- [ ] Assigned Agent values exist in agents.md (when PROVIDED) or match provisional IDs exactly
+- [ ] Assigned Agent values exist in agents.md (REQUIRED — exact IDs from resolved agents.md)
 - [ ] Target file(s) in each payload trace to repo_assessment.md or plan.md (marked PARTIAL if uncertain)
 - [ ] §5 present with Retry Boundaries, Merge Conflict Hotspots, and Open Questions
 - [ ] No truncated mid-task payloads; document ends cleanly after §5

@@ -84,7 +84,7 @@ Output structure:
 - [ ] §0 lists every FR-xx, SC-xx, and plan phase with covering Task IDs
 - [ ] AgentRoutingMode matches constitution.md (PROVIDED vs PROVISIONAL)
 - [ ] §2 linear order is a valid topological sort of §1 DAG
-- [ ] Assigned Agent values exist in agents.md (when PROVIDED) or match provisional IDs exactly
+- [ ] Assigned Agent values exist in agents.md (REQUIRED — exact IDs from resolved agents.md)
 - [ ] §3 manifest row count matches tasks_index.json entry count
 
 ### Task sizing
