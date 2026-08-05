@@ -1,6 +1,6 @@
 # openspec-bugfix-workflow
 
-Custom [OpenSpec](https://github.com/Fission-AI/OpenSpec) schema for **gated, Jira-driven bug fixing** with AI-assisted triage, reproduction, RCA, planning, and implementation. Supports two code-generation strategies: **ai-helpers** (OAPE command routing + eval gate) and **direct** (plain agent implementation).
+Custom [OpenSpec](https://github.com/Fission-AI/OpenSpec) schema for **gated, Jira-driven bug fixing** with AI-assisted triage, reproduction, RCA, and implementation. Implementation is **direct**: the agent reads context files and implements code via FILE OPERATIONS, with per-task user approval — no OAPE commands, no design bundles, no code eval gate.
 
 ---
 
@@ -16,26 +16,7 @@ git clone -b Version-1 https://github.com/chirag-wrk/bug-fix-workflow.git /tmp/o
 
 This copies `openspec/`, `.cursor/`, `eval-generation/`, and `dashboard/` into your project, installs the OpenSpec CLI, and sets up dependencies. Use `--no-dashboard` to skip the dashboard.
 
-### 2. Choose code generation mode (`openspec/config.yaml`)
-
-Set `flags.codegen_mode` before you start implementing tasks:
-
-```yaml
-# openspec/config.yaml
-flags:
-  codegen_mode: ai-helpers   # or: direct
-```
-
-
-| Mode                       | When to use                                                                                      | What `/opsx-apply` does                                                          |
-| -------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
-| `**ai-helpers**` (default) | API/controller/e2e work that benefits from specialized OAPE Cursor commands and a code eval gate | design-bundle → OAPE command → verify → code eval → refine → approve             |
-| `**direct**`               | Straightforward fix tasks; simpler/faster path                                                   | agent reads context → FILE OPERATIONS → verify → approve (no OAPE, no code eval) |
-
-
-Change the flag anytime; `/opsx-apply` reads it on each invocation. Details below under [Configuration](#configuration-openspecconfigyaml).
-
-### 3. Start the Dashboard (optional)
+### 2. Start the Dashboard (optional)
 
 ```bash
 cd /path/to/your-operator-repo
@@ -44,11 +25,11 @@ cd /path/to/your-operator-repo
 
 Installs deps on first run, starts the FastAPI backend (port 8000) and React frontend (port 5173). Open [http://localhost:5173](http://localhost:5173). See `dashboard/README.md` for details.
 
-### 4. Restart Cursor
+### 3. Restart Cursor
 
 Restart Cursor so slash commands load from `.cursor/commands/`.
 
-### 5. Run your first bug-fix change
+### 4. Run your first bug-fix change
 
 Open the **operator repo** as the Cursor workspace (recommended for working-folder mode), then:
 
@@ -60,8 +41,12 @@ Only the **Jira Bug ticket key** is required at `/opsx-new`. Then progress with 
 
 ```
 bug-validation.json → bug-report.md → repro-verification-report.md → rca-report.md
-  → bugfix-plan.md → tasks.md → /opsx-apply → archive
+  → (bugfix-plan.md generated silently) → tasks.md → /opsx-apply → archive
 ```
+
+`bugfix-plan.md` is generated automatically between `rca-report.md` and `tasks.md` — it
+is internal context only, never shown for approval. The agent asks any clarifying
+questions it needs before generating `tasks.md`.
 
 **Repro Verification tip (OpenShift operators):** Prefer reproducing in Cursor agent chat via repo-local tests/envtest, make targets, or must-gather / user-provided logs. Use a live cluster only when access exists and repo-local evidence is insufficient. If a real OpenShift cluster is required but unavailable, mark **Partial** and document the limitation — do not invent live-cluster output. See [Repro Verification](#repro-verification).
 
@@ -109,18 +94,23 @@ Primary input: **Jira Bug ticket key** (stored in `inputs/jira.yaml`). Target Gi
 /opsx-continue              → bug-report.md                 [approve]
 /opsx-continue              → repro-verification-report.md  [approve]
 /opsx-continue              → rca-report.md                 [approve]
-/opsx-continue              → bugfix-plan.md               [approve]
-/opsx-continue              → tasks.md                      [approve]
+/opsx-continue              → bugfix-plan.md (generated silently, no approval)
+                            → tasks.md                       [approve]
 ```
 
-Each artifact is:
+Each user-visible artifact is:
 
 1. Generated from the template
 2. Evaluated against stage evals
 3. Refined if needed
 4. Presented for your approval
 
-If you **reject**, the agent refines and re-runs evals until you approve (except `bug-report.md`, which exits on reject per config). Previously approved artifacts stay immutable.
+`bugfix-plan.md` is the one exception: it has no eval gate, no scorecard, and no
+approval prompt. It is generated automatically right before `tasks.md`, and the
+agent may ask you clarifying questions (e.g. task sizing, open questions from the
+plan) before generating `tasks.md` in the same `/opsx-continue` invocation.
+
+If you **reject** a user-visible artifact, the agent refines and re-runs evals until you approve (except `bug-report.md`, which exits on reject per config). Previously approved artifacts stay immutable.
 
 ### Implement tasks
 
@@ -128,23 +118,11 @@ If you **reject**, the agent refines and re-runs evals until you approve (except
 /opsx-apply                 → task T1 [approve] → task T2 [approve] → … → done
 ```
 
-The implementation flow depends on `codegen_mode` in `openspec/config.yaml`:
+Implementation is direct-only:
 
-**ai-helpers mode** (`codegen_mode: ai-helpers`):
-
-1. Compose `design-bundle.md` scoped to that task
-2. Resolve one OAPE command (or manual work)
-3. Run in fork working copy (or project cwd in working-folder mode)
-4. Verify against acceptance criteria (including regression / repro checks)
-5. Run code-generation evals → refine code (max 2 passes)
-6. Present task summary + scorecard → user approval
-7. On approve: mark task complete, next task
-
-**direct mode** (`codegen_mode: direct`):
-
-1. Read context files (agents.md, constitution.md, bug report, RCA, plan)
+1. Read context files (agents.md, constitution.md, bug-report.md, rca-report.md, bugfix-plan.md)
 2. Implement code directly via FILE OPERATIONS
-3. Verify against acceptance criteria
+3. Verify against acceptance criteria (including regression / repro checks)
 4. Present task summary → user approval
 5. On approve: mark task complete, next task
 
@@ -212,19 +190,6 @@ The agent clones your fork, implements task-by-task, and opens a draft PR.
 | `/opsx-explore`      | Explore ideas without creating artifacts             |
 
 
-### OAPE commands (ai-helpers mode only, during `/opsx-apply`)
-
-
-| Command                    | When                          |
-| -------------------------- | ----------------------------- |
-| `/oape:api-generate`       | API_Agent task                |
-| `/oape:api-generate-tests` | API_Agent verification task   |
-| `/oape:api-implement`      | OperatorController_Agent task |
-| `/oape:e2e-generate`       | E2E / Testing_Agent task      |
-
-
-These commands are **not used** when `codegen_mode: direct`.
-
 ### Retrospective eval loop
 
 
@@ -241,24 +206,20 @@ Key flags you can tune:
 
 ```yaml
 flags:
-  codegen_mode: ai-helpers       # "ai-helpers" or "direct"
   max_feedback_rounds: 3
   exit_on_all_tasks_complete: true
 ```
 
 
-| Flag                         | Default      | What it does                                                                                                             |
-| ---------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `codegen_mode`               | `ai-helpers` | Code generation strategy: `ai-helpers` (OAPE commands + code eval gate) or `direct` (plain agent, no OAPE, no eval gate) |
-| `max_feedback_rounds`        | 3            | Max rejection + refinement loops per artifact before halting                                                             |
-| `exit_on_all_tasks_complete` | true         | Auto-exit implementation when all tasks marked `[x]`                                                                     |
+| Flag                         | Default | What it does                                                  |
+| ---------------------------- | ------- | -------------------------------------------------------------- |
+| `max_feedback_rounds`        | 3       | Max rejection + refinement loops per artifact before halting   |
+| `exit_on_all_tasks_complete` | true    | Auto-exit implementation when all tasks marked `[x]`           |
 
 
-### Code generation modes
+### Implementation
 
-`**ai-helpers**` — For each task, composes a `design-bundle.md`, routes to specialized OAPE Cursor commands (`api-generate`, `api-implement`, `e2e-generate`), scores generated code via a code-generation eval gate, refines until evals pass, then asks for user approval.
-
-`**direct**` — The Cursor agent reads context files directly, implements code via FILE OPERATIONS, verifies against acceptance criteria, and asks for user approval. No OAPE commands, no design bundles, no code eval gate. Simpler and faster for straightforward fix tasks.
+Implementation is **direct-only**: for each task, the Cursor agent reads context files (agents.md, constitution.md, bug-report.md, rca-report.md, bugfix-plan.md), implements code via FILE OPERATIONS, verifies against acceptance criteria, and asks for user approval. No OAPE commands, no design bundles, no code eval gate.
 
 ---
 
@@ -342,10 +303,10 @@ bug-validation → bug-report → repro-verification → rca → bugfix-plan →
 | **Bug Triage**           | `bug-validation.json`, `bug-report.md` | Validate Jira bug completeness; structure bug context, ARD, and original PRs                                |
 | **Repro Verification**   | `repro-verification-report.md`         | Confirm reproducibility (repo-local tests/envtest, must-gather, or live cluster); capture failure signature |
 | **Root Cause Analysis**  | `rca-report.md`                        | Trace failure path from signature to root cause                                                             |
-| **Bug Fix Planning**     | `bugfix-plan.md`                       | Single-phase fix plan, regression strategy, rollback                                                        |
+| **Bug Fix Planning (internal)** | `bugfix-plan.md`                | Single-phase fix plan, regression strategy, rollback — generated silently, no approval                      |
 | **Constitution (input)** | `constitution.md` (resolved)           | Non-negotiable guardrails (resolved before planning)                                                        |
 | **Task creation**        | `tasks.md`                             | Executable backlog: code fix, regression test, verification                                                 |
-| **Implementation**       | code + `implementation-report.md`      | Task-by-task execution with per-task approval (ai-helpers or direct mode)                                   |
+| **Implementation**       | code + `implementation-report.md`      | Task-by-task direct execution with per-task approval                                                        |
 | **Archive**              | archived change                        | Close out                                                                                                   |
 
 

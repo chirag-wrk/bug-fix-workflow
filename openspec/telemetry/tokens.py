@@ -67,11 +67,11 @@ def estimate_artifact_tokens(change_dir: Path, artifact_id: str) -> tuple[int, i
                 input_files.append(f)
 
     dependency_map = {
-        "specs": ["validation.json"],
-        "repo-assessment": ["specs.md"],
-        "constitution": ["specs.md", "repo-assessment.md"],
-        "plan": ["specs.md", "repo-assessment.md", "constitution.md"],
-        "tasks": ["specs.md", "plan.md", "constitution.md"],
+        "bug-report": ["bug-validation.json"],
+        "repro-verification": ["bug-report.md"],
+        "rca": ["bug-report.md", "repro-verification-report.md"],
+        "bugfix-plan": ["bug-report.md", "rca-report.md", "constitution.md"],
+        "tasks": ["bug-report.md", "rca-report.md", "bugfix-plan.md", "constitution.md"],
     }
 
     for dep_name in dependency_map.get(artifact_id, []):
@@ -79,7 +79,16 @@ def estimate_artifact_tokens(change_dir: Path, artifact_id: str) -> tuple[int, i
         if dep_path.exists():
             input_files.append(dep_path)
 
-    output_path = change_dir / f"{artifact_id}.md"
+    # Generated filename doesn't always match artifact_id (e.g. "rca" → rca-report.md)
+    output_filename_map = {
+        "bug-validation": "bug-validation.json",
+        "bug-report": "bug-report.md",
+        "repro-verification": "repro-verification-report.md",
+        "rca": "rca-report.md",
+        "bugfix-plan": "bugfix-plan.md",
+        "tasks": "tasks.md",
+    }
+    output_path = change_dir / output_filename_map.get(artifact_id, f"{artifact_id}.md")
     if not output_path.exists():
         output_path = change_dir / f"{artifact_id}.json"
     if output_path.exists():
@@ -92,22 +101,25 @@ def estimate_artifact_tokens(change_dir: Path, artifact_id: str) -> tuple[int, i
 
 
 def estimate_task_tokens(change_dir: Path, task_id: str, fork_dir: Path | None = None) -> tuple[int, int]:
-    """Estimate input/output tokens for a code generation task.
+    """Estimate input/output tokens for a code generation task (direct mode).
 
-    Input = design bundle + context artifacts.
+    Input = context artifacts read directly (no design bundle).
     Output = task report (as proxy for generated code volume).
     """
     input_files: list[Path] = []
     output_files: list[Path] = []
 
-    for ctx_file in ["specs.md", "plan.md", "constitution.md", "tasks.md", "repo-assessment.md"]:
+    for ctx_file in [
+        "bug-report.md",
+        "rca-report.md",
+        "bugfix-plan.md",
+        "constitution.md",
+        "tasks.md",
+        "repro-verification-report.md",
+    ]:
         p = change_dir / ctx_file
         if p.exists():
             input_files.append(p)
-
-    design_bundle = change_dir / "implementation" / "design-bundle.md"
-    if design_bundle.exists():
-        input_files.append(design_bundle)
 
     task_report = change_dir / "implementation" / "task-reports" / f"{task_id}.md"
     if task_report.exists():
@@ -123,16 +135,23 @@ def estimate_task_tokens(change_dir: Path, task_id: str, fork_dir: Path | None =
 
 
 def estimate_phase5_tokens(change_dir: Path) -> tuple[int, int]:
-    """Batch-safe token estimate for the entire code_generation phase.
+    """Batch-safe token estimate for the entire implementation phase (direct mode).
 
-    Counts shared context (specs, plan, etc.) exactly once as input, and sums
-    all task reports + eval results as output.  Use this instead of summing
-    per-task estimates when multiple tasks were completed in a single session.
+    Counts shared context exactly once as input, and sums all task reports as
+    output. Use this instead of summing per-task estimates when multiple tasks
+    were completed in a single session.
     """
     input_files: list[Path] = []
     output_files: list[Path] = []
 
-    for ctx_file in ["specs.md", "plan.md", "constitution.md", "tasks.md", "repo-assessment.md"]:
+    for ctx_file in [
+        "bug-report.md",
+        "rca-report.md",
+        "bugfix-plan.md",
+        "constitution.md",
+        "tasks.md",
+        "repro-verification-report.md",
+    ]:
         p = change_dir / ctx_file
         if p.exists():
             input_files.append(p)
@@ -143,18 +162,9 @@ def estimate_phase5_tokens(change_dir: Path) -> tuple[int, int]:
             if f.is_file() and f.suffix in (".yaml", ".yml", ".md", ".txt", ".json"):
                 input_files.append(f)
 
-    design_bundle = change_dir / "implementation" / "design-bundle.md"
-    if design_bundle.exists():
-        input_files.append(design_bundle)
-
     reports_dir = change_dir / "implementation" / "task-reports"
     if reports_dir.exists():
         for f in reports_dir.glob("*.md"):
-            output_files.append(f)
-
-    eval_dir = change_dir / "eval-results"
-    if eval_dir.exists():
-        for f in eval_dir.glob("code-generation-*.yaml"):
             output_files.append(f)
 
     tokens_in = estimate_tokens_for_files(input_files)

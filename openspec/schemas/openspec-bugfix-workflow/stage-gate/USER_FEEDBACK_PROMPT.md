@@ -61,8 +61,6 @@ Load mapping from `{schema_root}/stage-gate/artifact-eval-map.yaml` for the curr
 | 6 | **Prior feedback rounds** | `openspec/changes/<change>/feedback_stage_artifacts/<artifact-id>/round-*.yaml` |
 | 7 | **Change inputs** | `inputs/jira.yaml`, `jira-spec.md` if present |
 
-For **joint gates** (`repro-verification` + related artifacts): load both current artifacts and both templates; revise both in one round.
-
 ---
 
 ## Step 3 — Update template (if required)
@@ -94,7 +92,7 @@ Using:
 - User feedback (verbatim)
 - Openspec instructions
 
-Regenerate **only** the current artifact at `outputPath`. For joint gates, regenerate **both** co-generated files — never upstream approved artifacts.
+Regenerate **only** the current artifact at `outputPath` — never upstream approved artifacts.
 
 Address every feedback point. Preserve content that already passes eval cases and does not conflict with feedback.
 
@@ -106,12 +104,6 @@ Append one round file:
 
 ```
 openspec/changes/<change>/feedback_stage_artifacts/<artifact-id>/round-<N>.yaml
-```
-
-Joint gate:
-
-```
-openspec/changes/<change>/feedback_stage_artifacts/repro-verification/round-<N>.yaml
 ```
 
 Use schema in `{schema_root}/feedback_stage_artifacts/README.md`. Include:
@@ -172,10 +164,16 @@ Constitution is resolved as an input **before** bugfix-planning — it is not a 
 
 ## Implementation task approval variant
 
-Implementation runs OAPE **task-by-task**. User approval is required **after every
-task** before advancing to the next. On reject, append feedback to
-`implementation/design-bundle.md` **REVISION FEEDBACK** and re-run OAPE commands for
-the **current task only** — do not use this artifact feedback loop for per-task code.
+Implementation runs **task-by-task**, direct mode only. User approval is required
+**after every task** before advancing to the next. On reject, incorporate the
+feedback into the implementation approach and re-run the **current task only** —
+do not use this artifact feedback loop for per-task code.
+
+## bugfix-plan is not covered by this gate
+
+`bugfix-plan.md` has no user approval and no feedback loop — it is generated
+silently (see schema `bugfix-plan` artifact and `artifact-eval-map.yaml`). Skip
+this prompt entirely for `bugfix-plan`.
 
 ---
 
