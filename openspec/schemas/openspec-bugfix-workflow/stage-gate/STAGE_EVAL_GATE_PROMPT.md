@@ -69,19 +69,19 @@ openspec/changes/<change-name>/eval-results/<artifact-id>.yaml
 ```
 
 ```yaml
-artifact_id: bugfix-plan
-artifact_path: openspec/changes/my-bugfix/bugfix-plan.md
-stage: bugfix-plan
-stage_eval_file: evals/bugfix-plan_eval.yaml
+artifact_id: rca
+artifact_path: openspec/changes/my-bugfix/rca-report.md
+stage: rca
+stage_eval_file: evals/rca_eval.yaml
 scored_at: <ISO8601>
 overall_score: 72
 overall_pass: false
 cases:
-  - id: eval-r001-bugfix-plan-001
+  - id: eval-r001-rca-001
     score: 100
     pass: true
     failures: []
-  - id: eval-r002-bugfix-plan-003
+  - id: eval-r002-rca-003
     score: 45
     pass: false
     failures:

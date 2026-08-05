@@ -1,5 +1,5 @@
 {
-  "workspace": "${OPSX_WORKSPACE}",
+  "workspace": "/home/cdate/Documents/Agentic-bugfix/openspec",
 
   "server": {
     "host": "0.0.0.0",

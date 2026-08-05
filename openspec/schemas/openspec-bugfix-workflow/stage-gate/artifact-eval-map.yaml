@@ -47,9 +47,13 @@ artifacts:
     stage: bugfix-plan
     generates: bugfix-plan.md
     schema_template: bugfix-plan-template.md
-    stage_eval_file: evals/bugfix-plan_eval.yaml
+    stage_eval_file: null
     eval_spec: null
-    gate: stage_evals
+    gate: skip
+    note: >-
+      Internal artifact generated silently after rca-report.md — no user
+      approval gate, no eval scorecard, no evaluation report. Feeds tasks.md
+      authoring only.
 
   tasks:
     stage: tasks
@@ -61,10 +65,12 @@ artifacts:
 
   implementation:
     stage: implementation
-    stage_eval_file: evals/code-generation_eval.yaml
+    stage_eval_file: null
     eval_spec: null
-    gate: stage_evals
-    note: Score implementation task reports during code-generation eval gate
+    gate: skip
+    note: >-
+      No stage eval file — per-task verification only (build/vet/test/make
+      targets from tasks.md §4 Acceptance criteria; see schema task_verification).
 
   implementation-report:
     gate: skip

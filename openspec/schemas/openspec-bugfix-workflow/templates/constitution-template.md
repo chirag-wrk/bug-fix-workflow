@@ -13,9 +13,10 @@ from introducing incompatible patterns, ignoring existing conventions, or duplic
 ## Inputs (provided in the user message or change context)
 - Repository analysis: directory tree, key file contents, git log, branch, commit
   (from target repo, working folder, or agent tools — see schema working_folder_repo).
-- Feature specification (specs.md): the "what" being built.
-- Optional AGENTS.md / agents.md from the target repo or change inputs/: explicit agent
-  routing and conventions (see schema agents_md).
+- Bug context (bug-report.md): the bug being fixed and its affected feature area.
+- agents.md from openspec/inputs/ or the target repo — **REQUIRED** (see schema agents_md).
+  Do not proceed without it; this generation step is one-time and only runs when
+  constitution.md itself is missing (see schema constitution_md.when_missing).
 
 ## Task
 1) Derive Core Principles from the repo's ACTUAL conventions — each principle must be
@@ -23,14 +24,16 @@ from introducing incompatible patterns, ignoring existing conventions, or duplic
 2) Record Additional Constraints: tech stack requirements, compliance standards, deployment policies.
 3) Document Development Workflow: code review requirements, testing gates, CI/CD process as
    actually practiced (from .github/workflows, Makefile targets, CONTRIBUTING.md, etc.).
-4) If AGENTS.md was found: set AgentRoutingMode: PROVIDED and record agent definitions.
-   If not found: set AgentRoutingMode: PROVISIONAL with provisional agent IDs.
+4) Set AgentRoutingMode: PROVIDED and record agent definitions from agents.md (required — no
+   provisional taxonomy).
 5) Governance section: how this constitution relates to AGENTS.md/CLAUDE.md/CONTRIBUTING.md.
 
 ## Quality rules
 - Every principle must be repo-evidence-backed. Do not invent principles.
-- Do not include implementation decisions — those belong in plan.md (Planning Stage).
-- Do not include file lists or risk analysis — those belong in repo-assessment.md.
+- Do not include implementation decisions — those belong in bugfix-plan.md (internal
+  Bug Fix Planning Stage).
+- Do not include file lists or risk analysis — keep this document to principles and
+  workflow only.
 
 ## Output
 Output ONLY the complete constitution.md markdown document.
@@ -41,21 +44,20 @@ Follow the output template structure exactly.
 
 ## Output Template
 
-<!-- Companion artifact: repo-assessment.md (target files, reusable assets, risks) -->
 # [PROJECT_NAME] Constitution
 
-**AgentRoutingMode:** PROVIDED | PROVISIONAL
-<!-- PROVIDED when AGENTS.md exists in repo; PROVISIONAL otherwise — downstream tasks MUST match this value -->
+**AgentRoutingMode:** PROVIDED
+<!-- agents.md is REQUIRED for this schema — AgentRoutingMode is always PROVIDED -->
 
 **Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
 
 <!--
-  QUALITY TARGET: ≥90% against Stage 2 constitution rubric.
+  QUALITY TARGET: ≥90% against constitution rubric.
   Self-check (all must pass):
   - Every principle cites observable repo evidence (file path or pattern), not generic best practices.
-  - No file inventories, hook tables, or risk analysis — those belong in repo-assessment.md only.
-  - No implementation sequencing — that belongs in plan.md (Stage 3).
-  - AgentRoutingMode matches whether AGENTS.md was found and parsed.
+  - No file inventories or risk analysis — keep this document to principles and workflow only.
+  - No implementation sequencing — that belongs in bugfix-plan.md.
+  - AgentRoutingMode is PROVIDED and matches agents.md agent IDs.
   - Upstream operand vs Open: separate principles where the repo embeds upstream workloads.
   - Addon controllers: note controller-runtime exception if repo uses library-go for core + runtime for addons.
 -->
@@ -114,8 +116,8 @@ Follow the output template structure exactly.
 
 ## Agent Routing
 
-<!-- Only when AgentRoutingMode is PROVIDED — summarize AGENTS.md agent IDs and when to use each.
-     When PROVISIONAL: list provisional IDs and state that downstream tasks must use them exactly. -->
+<!-- Summarize agents.md agent IDs and when to route each. AgentRoutingMode is
+     always PROVIDED for this schema — agents.md is a required input. -->
 
 | Agent ID | Scope | When to route |
 |----------|-------|---------------|
@@ -123,8 +125,8 @@ Follow the output template structure exactly.
 
 ## Governance
 
-- This constitution supersedes ad-hoc conventions for downstream Planning, Task Creation, and Code Generation agents.
+- This constitution supersedes ad-hoc conventions for downstream Bug Fix Planning, Task Creation, and Implementation agents.
 - **Amendments:** require documented evidence of repo change; bump Version and Last Amended date.
-- **Conflicts:** if spec contradicts constitution, escalate in plan.md §8 — do not silently override.
+- **Conflicts:** if the bug fix approach contradicts constitution, escalate in bugfix-plan.md §8 Open Questions — do not silently override.
 - **Companion docs:** AGENTS.md / CLAUDE.md / CONTRIBUTING.md — [which takes precedence for what].
 - **Complexity:** new patterns must justify deviation from existing repo conventions with explicit rationale.

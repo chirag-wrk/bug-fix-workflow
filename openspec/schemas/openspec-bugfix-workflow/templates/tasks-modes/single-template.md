@@ -1,11 +1,7 @@
 ## Mode: Single-pass (default)
 
-Generate the complete tasks.md (§0 through §5) in a single response.
-
-### Phase scope
-When `phase_scope` metadata is present, generate §0-§5 for the specified plan
-phase ONLY. §0 maps only that phase's spec goals. §1-§5 contain only that
-phase's tasks. Task IDs use the phase prefix (T{N}_*).
+Generate the complete tasks.md (§0 through §5) in a single response. Bug fixes
+are typically single-phase — there is no `phase_scope` metadata for this schema.
 
 ### Completeness rules
 - **§5 Orchestration notes is MANDATORY** — never omit. Include Retry Boundaries, Merge Conflict
@@ -15,22 +11,20 @@ phase's tasks. Task IDs use the phase prefix (T{N}_*).
 - **Generation priority when space-constrained:** §0 coverage checklist → §3 manifest (all tasks) →
   §2 linear order → §1 DAG → §4 payloads (all tasks, brief) → §5 orchestration notes.
 - Unit test co-generation: every Go implementation task MUST include test co-generation in its
-  §4 Acceptance criteria (not separate tasks). Use actual Makefile targets from repo_assessment.
+  §4 Acceptance criteria (not separate tasks). Use actual Makefile targets from the target repo.
 
 ### Output sections — use these EXACT `##` headings in your response
 
 ## 0. Input coverage checklist
-One bullet per spec requirement (FR-xx, SC-xx, AC-xx) and plan phase, each with the Task IDs that
-cover it. Every spec goal and every plan phase must appear.
+One bullet per RCA finding and bugfix-plan action, each with the Task IDs that cover it.
+Every root cause finding and fix approach item must appear.
 
 ## 1. Task Dependency Graph (Mermaid)
 ```mermaid
 graph TD
-    subgraph phase1 [Phase 1: PHASE_NAME]
-        T1_1[Task 1.1: TITLE]
-        T1_2[Task 1.2: TITLE]
-        T1_1 --> T1_2
-    end
+    T1_1[Task 1.1: TITLE]
+    T1_2[Task 1.2: TITLE]
+    T1_1 --> T1_2
 ```
 
 ## 2. Linear Execution Order
@@ -39,17 +33,18 @@ graph TD
 ...
 
 ## 3. Task Execution Manifest
-| Task ID | Task Title | Assigned Agent | Phase | Depends On | Parallel OK | Complexity | Risk |
-|---------|-----------|---------------|-------|-----------|------------|-----------|------|
-| T1_1 | [TITLE] | [AGENT_ID] | [PHASE] | none | No | [1-8] | [Low/Med/High] |
+| Task ID | Task Title | Assigned Agent | Depends On | Parallel OK | Complexity | Risk |
+|---------|-----------|---------------|-----------|------------|-----------|------|
+| T1_1 | [TITLE] | [AGENT_ID] | none | No | [1-8] | [Low/Med/High] |
 
 ## 4. Task Specifications (Payloads)
 ### Task <ID>: <Title>
 - **Objective:** ...
-- **Target file(s):** ... (from repo_assessment/plan only)
+- **Root cause trace:** ... (link back to specific RCA finding in rca-report.md)
+- **Target file(s):** ... (from rca-report.md/bugfix-plan.md only)
 - **Non-goals / forbidden edits:** ...
 - **Implementation notes:** ... (non-code)
-- **Acceptance criteria:** ... (trace to validated_specs.md)
+- **Acceptance criteria:** ... (trace to rca-report.md)
 - **Downstream handoff:** ...
 
 ## 5. Orchestration Notes
@@ -58,12 +53,12 @@ graph TD
 - Open Questions Requiring SME Before Execution
 
 ### Quality self-check
-- [ ] §0 lists every FR-xx, SC-xx, and plan phase with covering Task IDs
+- [ ] §0 lists every RCA finding and bugfix-plan action with covering Task IDs
 - [ ] AgentRoutingMode matches constitution.md (PROVIDED vs PROVISIONAL)
 - [ ] §3 manifest row count equals §4 payload subsection count (every ID covered)
 - [ ] §2 linear order is a valid topological sort of §1 DAG
-- [ ] Assigned Agent values exist in agents.md (when PROVIDED) or match provisional IDs exactly
-- [ ] Target file(s) in each payload trace to repo_assessment.md or plan.md (marked PARTIAL if uncertain)
+- [ ] Assigned Agent values exist in agents.md (REQUIRED — exact IDs from resolved agents.md)
+- [ ] Target file(s) in each payload trace to rca-report.md or bugfix-plan.md (marked PARTIAL if uncertain)
 - [ ] §5 present with Retry Boundaries, Merge Conflict Hotspots, and Open Questions
 - [ ] No truncated mid-task payloads; document ends cleanly after §5
 

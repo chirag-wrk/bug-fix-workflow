@@ -12,7 +12,7 @@ You MUST treat these as authoritative, in this precedence order:
 2) rca-report.md (root cause analysis findings — the most critical input)
 3) bug-report.md (bug details, ARD context, PR references)
 4) repro-verification-report.md (reproduction evidence, failure signature)
-5) agents.md (optional) SME-defined capability matrix for downstream execution agents
+5) agents.md (REQUIRED — openspec/inputs/agents.md, else target repo AGENTS.md/agents.md)
 
 **constitution.md is a pre-approved input.** You MUST read it
 in full before producing the plan. All principles and guardrails in constitution.md are
@@ -47,16 +47,11 @@ If inputs conflict:
   as an explicit planning constraint (do not silently expand scope).
 
 ## agents.md usage
-agents.md is an INPUT resolved via lookup order: change inputs/ → target repo → schema inputs/.
+agents.md is a **REQUIRED** INPUT resolved via lookup order: openspec/inputs/agents.md →
+change inputs/ → target repo AGENTS.md/agents.md (see schema agents_md).
 It contains operator-specific agent routing, architecture patterns, and test conventions.
-Read it in full before planning.
-
-- If agents.md is PROVIDED: map fix work to concrete agent IDs/capabilities defined there.
-- If agents.md is NOT PROVIDED: use the provisional capability taxonomy below and label it clearly as
-  provisional in section 0.
-
-Provisional taxonomy (use only when agents.md missing):
-API, OperatorController, ManifestsBindata, WebhookTLS, RBACSecurity, OLMRelease, Testing, Docs.
+Read it in full before planning. Map fix work to concrete agent IDs/capabilities defined there.
+If agents.md cannot be resolved, STOP and ask the user — do not use provisional taxonomy.
 
 ## Required output schema (markdown headings must match exactly)
 Output EXACTLY ONE markdown document using these headings and order:
@@ -125,7 +120,7 @@ Before finalizing, verify:
 | bug-report.md | PROVIDED / NOT PROVIDED |
 | repro-verification-report.md | PROVIDED / NOT PROVIDED |
 | constitution.md | PROVIDED / PLACEHOLDER — if placeholder, list provisional guardrails assumed |
-| agents.md | PROVIDED / NOT PROVIDED — if not provided, state provisional taxonomy used |
+| agents.md | [path — REQUIRED; STOP if unresolved] |
 | AgentRoutingMode | PROVIDED / PROVISIONAL (from constitution.md) |
 
 ### § 1. Root Cause Summary
@@ -261,12 +256,12 @@ bug-report.md:
 repro-verification-report.md:
 <<<PASTE repro-verification-report.md OR leave exactly the line: NOT_PROVIDED>>>
 
-agents.md (INPUT — resolved via lookup order: change inputs/ → target repo → schema inputs/):
-<<<PASTE agents.md — pre-approved input; read ALL routing rules before planning; OR leave exactly the line: NOT_PROVIDED>>>
+agents.md (REQUIRED INPUT — openspec/inputs/agents.md, else target repo AGENTS.md/agents.md):
+<<<PASTE agents.md — required; read ALL routing rules before planning>>>
 
 instructions:
 Generate `bugfix-plan.md` content per the system schema.
-- If agents_md is NOT_PROVIDED, use the provisional capability taxonomy and label it in section 0.
+- agents.md is REQUIRED; if unresolved, STOP and ask the user (no provisional taxonomy).
 - Fix scope must trace directly to rca-report.md root cause — do not expand beyond it.
 - Files to change must come from rca-report.md or verified code inspection.
 - Regression test strategy must cover the specific root cause, not generic test improvements.

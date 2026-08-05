@@ -2,14 +2,16 @@ name: openspec-bugfix-workflow
 version: 1
 description: >-
   Gated bug-fix workflow: Bug Triage → Repro Verification → Root Cause Analysis →
-  Bug Fix Planning → Task Creation → Bug Fix Implementation. Produces
+  Bug Fix Planning (internal) → Task Creation → Bug Fix Implementation. Produces
   bug-validation.json, bug-report.md, repro-verification-report.md, rca-report.md,
-  bugfix-plan.md, tasks.md, and (during implementation) implementation-report.md
-  and optional deviation-observed.md.
+  tasks.md, and (during implementation) implementation-report.md and optional
+  deviation-observed.md.
+  bugfix-plan.md is generated silently after rca-report.md is approved — it is
+  internal context for Task Creation only, never presented for user approval.
   constitution.md is an INPUT (resolved from target repo or schema inputs/).
-  Implementation mode is controlled by config.yaml flags.codegen_mode:
-    "ai-helpers" — OAPE command orchestration with code-generation eval gate
-    "direct"     — plain agent implementation (no OAPE, no code eval gate).
+  Implementation is a single direct path: the agent reads context files and
+  implements code via FILE OPERATIONS, with per-task user approval. No OAPE
+  command routing, no code-generation eval gate, no design bundle.
   Templates from templates/.
 
 templates_dir: templates
@@ -19,71 +21,67 @@ templates_dir: templates
 # ---------------------------------------------------------------------------
 agents_md:
   description:
-    SME-defined execution agent roster and routing rules from the target repository.
-    Used for repo verification, RCA component mapping, bug fix planning, task
-    routing, and implementation. Not used during Bug Triage.
+    SME-defined execution agent roster and routing rules. Required for repro
+    verification and all downstream stages. Prefer openspec/inputs/agents.md;
+    if absent there, AGENTS.md/agents.md MUST exist in the target repository.
   canonical_file:
     path: agents.md
-    path_relative_to_schema: agents.md
+    path_relative_to_inputs: openspec/inputs/agents.md
     description: >-
-      Operator-specific agent roster and execution routing. Shipped inside the
-      schema package at openspec/schemas/openspec-agile-workflow/agents.md
-      (installed by install.sh from distribution repo root agents.md).
-      Customize this file for your operator.
+      Operator-specific agent roster, architecture mapping, and execution
+      routing. Place a copy at openspec/inputs/agents.md, or ensure the target
+      repo contains AGENTS.md / agents.md.
     use_when: >-
-      The target repo has no AGENTS.md/agents.md and change inputs do not
-      override with a local copy. Falls back to the bundled schema copy.
+      Required before repro-verification. Resolve from openspec/inputs/ first;
+      if missing, require AGENTS.md/agents.md in the target repo.
   used_in_stages:
     - id: repro-verification
-      required: false
+      required: true
       when: repro-verification-report authoring
       effect: >-
-        If found, repro-verification notes agent IDs for downstream use.
-        AgentRoutingMode is set in the pre-approved constitution.md input.
+        agents.md provides operator architecture and component mapping for
+        repro execution. AgentRoutingMode is set in the pre-approved
+        constitution.md input and must align with resolved agents.md.
     - id: root-cause-analysis
-      required: false
+      required: true
       when: rca-report authoring
       effect: >-
-        Map affected components to concrete agent IDs from AGENTS.md when provided;
-        helps identify which subsystem introduced the regression.
+        Map affected components to concrete agent IDs / subsystems from
+        agents.md; identify which subsystem introduced the regression.
     - id: bugfix-planning
-      required: false
-      when: bugfix-plan.md authoring
+      required: true
+      when: bugfix-plan.md authoring (internal — no user approval)
       effect: >-
-        Map fix approach to concrete agent IDs from AGENTS.md when provided;
-        otherwise use provisional taxonomy and label it in bugfix-plan.md.
+        Map fix approach to concrete agent IDs/capabilities defined in agents.md.
     - id: bugfix-task-creation
-      required: false
+      required: true
       when: tasks.md authoring (§3 manifest, §4 payloads)
       effect: >-
-        Assigned Agent must match AGENTS.md IDs when AgentRoutingMode is PROVIDED;
-        otherwise use provisional agent IDs from constitution/tasks template.
+        Assigned Agent must match agents.md IDs (AgentRoutingMode PROVIDED).
     - id: bugfix-implementation
-      required: false
+      required: true
       when: task-by-task bug fix code generation
       effect: >-
-        ai-helpers mode (codegen_mode = ai-helpers): Route Assigned Agent values
-        from tasks.md §3 to OAPE commands per schema oape_routing — one task at
-        a time. Compose design-bundle.md per task. Manual agents use task payloads
-        directly. User approval after every task before advancing.
-        direct mode (codegen_mode = direct): Agent reads context files and implements
-        code directly using FILE OPERATIONS. No OAPE command routing. User approval
-        after every task before advancing.
+        Agent reads context files (including agents.md) and implements code
+        directly using FILE OPERATIONS. No OAPE command routing, no design
+        bundle. User approval after every task before advancing.
   not_used_in_stages:
     - bug-triage
   lookup_order:
+    - "openspec/inputs/agents.md"
+    - "openspec/changes/<change>/inputs/AGENTS.md"
+    - "openspec/changes/<change>/inputs/agents.md"
     - "{target_repo}/AGENTS.md"
     - "{target_repo}/agents.md"
-    - "openspec/inputs/agents.md"
-    - "{schema_root}/agents.md"
   when_missing: >-
-    Before starting repro-verification, RCA, plan, or tasks — resolve agents.md
-    using lookup_order. Check the target repo first, then openspec/inputs/ folder,
-    then schema root. Persist a copy to openspec/changes/<change>/inputs/AGENTS.md
-    when first resolved so downstream artifacts reference a stable path. If still
-    absent, ask the user once to provide AGENTS.md. Do not invent agent IDs. If the
-    user declines, proceed with AgentRoutingMode PROVISIONAL and document in
-    bugfix-plan.md and tasks.md.
+    Before starting repro-verification (and any later stage that uses agents.md),
+    resolve agents.md using lookup_order. Prefer openspec/inputs/agents.md. If it
+    is not in the inputs folder, AGENTS.md or agents.md is REQUIRED in the target
+    repository. Persist a copy to openspec/changes/<change>/inputs/AGENTS.md when
+    first resolved so downstream artifacts reference a stable path. If still
+    absent, STOP and ask the user to provide agents.md (place it under
+    openspec/inputs/ or add it to the target repo). Do not invent agent IDs.
+    Do not proceed with AgentRoutingMode PROVISIONAL.
 
 # ---------------------------------------------------------------------------
 # constitution_md — pre-approved constitution provided as input
@@ -115,10 +113,8 @@ constitution_md:
       effect: Enforces coding conventions and testing requirements in task payloads.
     - id: bugfix-implementation
       required: true
-      when: bug fix code generation (both ai-helpers and direct modes)
-      effect: >-
-        Code must follow constitution principles. ai-helpers mode: verified during
-        code eval gate. direct mode: verified via acceptance criteria tests.
+      when: bug fix code generation
+      effect: Code must follow constitution principles, verified via acceptance criteria tests.
   not_used_in_stages:
     - bug-triage
   template_for_generation: templates/constitution-template.md
@@ -284,14 +280,14 @@ rca_analysis:
     - repro-verification-report.md (logs, failure signature)
     - ard-context.md (original PR intent)
     - pr-diffs/ (original code changes)
-    - repo-assessment.md or code inspection (current state)
-    - agents.md (component mapping)
+    - target repository code inspection (current state)
+    - agents.md (REQUIRED — component mapping; see agents_md)
   analysis_approach:
     - Trace failure path from symptom to root cause using logs
     - Compare actual behavior vs ARD intent from original PRs
     - Compare current code state vs original PR diffs
     - Identify the specific code path, condition, or interaction causing the bug
-    - Map affected components to AGENTS.md subsystems
+    - Map affected components to agents.md subsystems
     - Distinguish root cause from symptoms and secondary effects
   output: >-
     rca-report.md containing: failure path analysis, ARD intent vs actual
@@ -328,9 +324,8 @@ target_repo:
     writing repro-verification-report.md.
   usage: >-
     Reference for RCA, bug fix planning, and code inspection. Implementation
-    OAPE commands and edits apply to fork_repo_url (/opsx:apply), not
-    target_repo, unless the user explicitly directs otherwise or
-    working_folder_repo mode is active.
+    edits apply to fork_repo_url (/opsx:apply), not target_repo, unless the
+    user explicitly directs otherwise or working_folder_repo mode is active.
 
 # ---------------------------------------------------------------------------
 # working_folder_repo — local checkout mode (user-directed)
@@ -366,12 +361,13 @@ working_folder_repo:
       origin when possible; otherwise record working_folder_path and proceed with
       local analysis.
     agents_md: >-
-      Resolve AGENTS.md from the working folder first, then change inputs/.
+      Resolve agents.md via schema agents_md.lookup_order: prefer
+      openspec/inputs/agents.md; if absent, require AGENTS.md/agents.md in the
+      working folder (target repo). STOP if still missing.
   implementation:
     working_copy: >-
-      Same as working_folder_path / project root. All code edits (OAPE commands
-      in ai-helpers mode, direct FILE OPERATIONS in direct mode) apply in this
-      directory — not a cloned fork.
+      Same as working_folder_path / project root. All code edits (direct FILE
+      OPERATIONS) apply in this directory — not a cloned fork.
     cwd: project root (working folder)
     skip_fork_setup: true
     do_not:
@@ -399,17 +395,18 @@ stage_eval_gate:
     this schema package (evals/*_eval.yaml). Refine the change artifact only —
     never schema templates.
   schema_root:
-    installed: openspec/schemas/openspec-agile-workflow
-    distribution: schemas/openspec-agile-workflow
+    installed: openspec/schemas/openspec-bugfix-workflow
+    distribution: schemas/openspec-bugfix-workflow
   evals_dir: evals
   stage_eval_files:
     bug-report: evals/bug-report_eval.yaml
     repro-verification: evals/repro-verification_eval.yaml
     rca: evals/rca_eval.yaml
-    bugfix-plan: evals/bugfix-plan_eval.yaml
     tasks: evals/tasks_eval.yaml
-    implementation: evals/implementation_eval.yaml
   eval_specs_dir: eval-generation/eval-generation-workflow/stages
+  not_applicable_to:
+    - bugfix-plan  # internal artifact — no eval gate, no user-facing scorecard
+    - implementation  # per-task verification only; see artifact `implementation` gate
   system_prompt: stage-gate/STAGE_EVAL_GATE_PROMPT.md
   artifact_map: stage-gate/artifact-eval-map.yaml
   generation_templates: templates/
@@ -420,7 +417,7 @@ stage_eval_gate:
       After eval scoring, generate an evaluation report presenting pass/fail
       summary, gap analysis against input artifacts and agents.md, and quality
       assessment. Present to user alongside the artifact for approval.
-    generated_for: all artifacts (stage_evals, rubric_only, and skip gates)
+    generated_for: all user-approved artifacts (stage_evals, rubric_only, and skip gates) — excludes bugfix-plan (internal) and implementation (per-task verification)
   flow: >-
     generate_v1 → run_stage_evals → refine_artifact → generate_evaluation_report → user_approval
     → (reject → user_approval_feedback_gate → re_eval → regenerate_evaluation_report → user_approval)
@@ -469,67 +466,31 @@ task_sizing:
       host task. Remove merged ID from §1, §2, §3. Update Depends On refs.
 
 # ---------------------------------------------------------------------------
-# code_generation_eval_gate — per-task code evals during /opsx-apply
-# applies_when: codegen_mode = ai-helpers (skipped entirely in direct mode)
+# task_verification — per-task verification during /opsx-apply (direct mode only)
 # ---------------------------------------------------------------------------
-code_generation_eval_gate:
-  applies_when: "codegen_mode = ai-helpers"
+task_verification:
   description: >-
-    After each task's OAPE command (or manual agent work) and verification,
-    score generated bug fix code in the fork against code-generation evals
-    before user task approval. This gate ensures the fix addresses the root
-    cause, has minimal blast radius, and includes regression tests.
-    This gate is SKIPPED when codegen_mode = direct.
+    After implementing each task directly (FILE OPERATIONS), run the task's
+    Acceptance criteria commands (from tasks.md §4) plus any regression /
+    repro checks from bugfix-plan.md, then present results for user approval.
+    No eval gate, no code scoring — verification is real command execution
+    (go build, go vet, go test, make targets) with real exit codes.
   runs_during: bugfix-implementation
-  runs_after:
-    - oape_command_or_manual_work
-    - task_verification
+  runs_after: task_implementation
   runs_before:
     - task_summary
     - task_approval_gate
-  schema_root:
-    installed: openspec/schemas/openspec-agile-workflow
-    distribution: schemas/openspec-agile-workflow
-  stage_eval_file: evals/code-generation_eval.yaml
-  eval_spec: eval-generation/eval-generation-workflow/stages/code-generation-eval-spec.yaml
-  system_prompt: stage-gate/CODE_GENERATION_EVAL_PROMPT.md
-  eval_results: openspec/changes/<change>/eval-results/code-generation-<task-id>.yaml
-  filter_by: oape_command
-  oape_command_map:
-    api-generate: api-generate
-    api-generate-tests: api-generate-tests
-    api-implement: api-implement
-    e2e-generate: e2e-generate
-    manual: manual
-  also_run_cases_with_oape_command: any
-  mandatory_before_user_approval: true
-  max_refinement_passes: 2
   task_report:
     path: openspec/changes/<change>/implementation/task-reports/<task-id>.md
     template: templates/implementation-task-report-template.md
     write_on: task_approve
   flow: >-
-    execute_oape_or_manual → verify_task_criteria → run_code_generation_evals →
-    refine_code_until_pass_or_max_passes → present_task_summary_with_scorecard →
-    user_code_approval → write_task_report → next_task
+    implement_task_directly → run_verification_and_tests → fix_until_pass →
+    present_task_summary → user_approval → write_task_report → next_task
   task_approval_prompt: >-
-    Code eval score: {overall_score}% ({cases_pass}/{cases_total} cases pass).
-    Approve the bug fix code changes for task {task_id} ({task_title}) and proceed
-    to the next task? (Approve / Reject with feedback)
-  skip_when:
-    - stage_eval_file missing
-    - evals list empty
-    - no cases match resolved oape_command
-  refinement_context:
-    - fork_git_diff
-    - current_task_payload
-    - design_bundle
-    - failed_eval_cases
-    - constitution_md
-    - test_output
-    - rca_report
+    Approve the bug fix code changes for task {task_id} ({task_title}) and
+    proceed to the next task? (Approve / Reject with feedback)
   do_not_modify:
-    - evals/code-generation_eval.yaml
     - openspec/changes/<change>/tasks.md
     - approved_upstream_artifacts
 
@@ -552,8 +513,6 @@ user_approval_feedback_gate:
     schema_spec: feedback_stage_artifacts/README.md
     round_summary: >-
       openspec/changes/<change>/feedback_stage_artifacts/<artifact-id>/round-<N>.yaml
-    joint_round_summary: >-
-      openspec/changes/<change>/feedback_stage_artifacts/repro-verification/round-<N>.yaml
   max_feedback_rounds:
     default: 3
     config_key: flags.max_feedback_rounds
@@ -659,28 +618,26 @@ user_approval_feedback_gate:
       - bug-report
       - repro-verification
       - rca
-      - bugfix-plan
       - tasks
       - implementation
+    not_applicable_to: >-
+      bugfix-plan (internal artifact — no user approval gate, so no feedback
+      loop; see artifact bugfix-plan.gate).
     precedence: >-
       exit_on_reject (bug-report) overrides the feedback loop for listed artifacts.
       bug-report rejection does not use on_reject steps above.
   per_task_implementation_variant:
     description: >-
-      Implementation runs task-by-task. ai-helpers mode uses OAPE commands;
-      direct mode implements code directly. User approval is required after
-      every task before advancing to the next. On reject, incorporate feedback
-      and re-run the current task only — upstream approved artifacts and
-      already-approved tasks remain immutable.
-    feedback_target:
-      ai-helpers: implementation/design-bundle.md
-      direct: implementation approach (in-context)
+      Implementation runs task-by-task, direct mode only. User approval is
+      required after every task before advancing to the next. On reject,
+      incorporate feedback into the implementation approach and re-run the
+      current task only — upstream approved artifacts and already-approved
+      tasks remain immutable.
+    feedback_target: implementation approach (in-context; no persisted design bundle)
     on_reject: >-
-      ai-helpers mode: Append user feedback to REVISION FEEDBACK in
-      design-bundle.md; re-run OAPE commands for the current task only.
-      direct mode: Incorporate feedback into implementation approach; re-run
-      current task only. Both modes: do not mark the task complete, do not
-      advance to the next task, and do not edit approved upstream artifacts.
+      Incorporate feedback into implementation approach; re-run current task
+      only. Do not mark the task complete, do not advance to the next task,
+      and do not edit approved upstream artifacts.
   exit_on_reject:
     description: >-
       For listed artifacts, user rejection at the approval gate **ends the change
@@ -696,7 +653,7 @@ user_approval_feedback_gate:
             feedback_stage_artifacts/bug-report/round-1.yaml (single entry; no
             refinement rounds).
           - Do NOT regenerate bug-report.md
-          - Do NOT unlock repro-verification, RCA, plan, tasks, or implementation
+          - Do NOT unlock repro-verification, RCA, bugfix-planning, tasks, or implementation
           - STOP — exit the workflow for this change
         exit_message: >-
           bug-report.md was not approved. The openspec-bugfix-workflow stops at Bug
@@ -720,7 +677,7 @@ fork_repo:
     - opsx-continue
   when_missing: >-
     At the start of the Implementation Stage (/opsx:apply), BEFORE any clone
-    activity or OAPE command execution, read inputs/jira.yaml.
+    activity or implementation edits, read inputs/jira.yaml.
 
     **Working-folder mode** (see schema working_folder_repo): If
     use_working_folder_as_repo is true, or the user directs using the working
@@ -733,12 +690,11 @@ fork_repo:
     inputs/jira.yaml. Do not start bug fix code generation until the URL is
     recorded and the fork is cloned or verified accessible.
   working_copy: >-
-    **Default:** Clone or reuse a local checkout of fork_repo_url. All OAPE
-    commands and implementation edits apply to this working copy.
+    **Default:** Clone or reuse a local checkout of fork_repo_url. All
+    implementation edits apply to this working copy.
 
     **Working-folder mode:** Use the project root (working_folder_path in
-    inputs/jira.yaml). All OAPE commands and edits apply in cwd — do not clone
-    fork_repo_url.
+    inputs/jira.yaml). All edits apply in cwd — do not clone fork_repo_url.
 
     target_repo in inputs/jira.yaml remains the upstream reference from
     repro verification; implementation writes only to the fork unless the user
@@ -746,7 +702,7 @@ fork_repo:
   feature_branch:
     when: >-
       Immediately after fork_repo_url is recorded and the fork is cloned or
-      verified — BEFORE any OAPE command or implementation commits. **Skip when
+      verified — BEFORE any implementation commits. **Skip when
       working_folder_repo mode is active** unless the user explicitly requests a
       feature branch.
     steps:
@@ -779,160 +735,55 @@ fork_repo:
       Include the PR URL in the final summary and implementation-report.md.
 
 # ---------------------------------------------------------------------------
-# oape_routing — OAPE command orchestration for /opsx:apply
-# applies_when: codegen_mode = ai-helpers (ignored entirely in direct mode)
+# direct_implementation — per-task direct execution for /opsx:apply
 # ---------------------------------------------------------------------------
-oape_routing:
-  applies_when: "codegen_mode = ai-helpers"
+direct_implementation:
   description: >-
-    Maps tasks.md Assigned Agent values to OAPE cursor commands for bug fix
-    implementation. Implementation runs task-by-task: compose a design bundle
-    scoped to one task, invoke exactly one allowed OAPE command for that task
-    (see command_resolution), verify, then request user approval before
-    advancing. This routing is IGNORED when codegen_mode = direct.
-  code_generation_prompt: templates/code-generation-template.md
-  reference: oape-ai-e2e/AGENTS.md
-  commands_dir: .cursor/commands
-  allowed_commands:
-    - api-generate
-    - api-generate-tests
-    - api-implement
-    - e2e-generate
-  do_not_invoke_during_implementation:
-    - predict-regressions
-    - review
-    - implement-review-fixes
-    - analyze-rfe
-    - init
-  command_resolution: >-
-    Resolve exactly ONE OAPE command per task — no other OAPE commands.
-    IF the task is an e2e task (see e2e_task): use e2e-generate.
-    ELIF Assigned Agent is API_Agent and task is verification-only: use api-generate-tests.
-    ELIF Assigned Agent is API_Agent: use api-generate.
-    ELIF Assigned Agent is OperatorController_Agent: use api-implement.
-    ELIF Assigned Agent is manual (ManifestsBindata, WebhookTLS, RBACSecurity,
-    OLMRelease, Docs): no OAPE command — implement task payload directly.
-    ELSE: halt and ask user which allowed command applies.
-  e2e_task:
-    description: >-
-      When any condition is true, the task is an e2e task and MUST use e2e-generate
-      (and no other OAPE command).
-    when_any:
-      - Assigned Agent (tasks.md §3) is Testing_Agent
-      - tasks.md §4 Acceptance criteria references make test-e2e or test-e2e-wait-for-stable-state
-      - tasks.md §4 Target file(s) under test/ (e2e, ginkgo, or *_test.go integration/e2e paths)
-      - Task Title or §4 Objective contains "e2e" or "end-to-end" (case-insensitive)
-    command: e2e-generate
-    args: "<fork-default-branch>"
-  design_bundle:
-    path: openspec/changes/<change>/implementation/design-bundle.md
-    template: templates/design-bundle-template.md
-    composed_from:
-      - constitution.md
-      - bug-report.md
-      - rca-report.md
-      - bugfix-plan.md
-      - repro-verification-report.md
-      - tasks.md
-    scope: >-
-      Include full upstream artifacts plus tasks.md §4 payload ONLY for the
-      current Task ID (not the whole backlog). Add REVISION FEEDBACK when
-      re-running after task rejection.
-    invoke_as: >-
-      Pass as --design-doc <absolute-path-to-design-bundle.md> to
-      oape:api-generate and oape:api-implement (local file supported).
+    Implementation runs task-by-task, one task per /opsx-apply invocation.
+    The agent reads context (agents.md, constitution.md, bug-report.md,
+    rca-report.md, bugfix-plan.md, tasks.md §4 payload for the current task),
+    implements the fix directly via FILE OPERATIONS, verifies, then requests
+    user approval before advancing.
   task_execution:
     unit: task
     derive_from: tasks.md §3 Task Execution Manifest (Task ID, Assigned Agent, Depends On)
     order_by: tasks.md §2 Linear Execution Order; respect §1 DAG — do not start a task until Depends On are complete
     task_approval_gate: >-
-      After OAPE/manual work, verification, and code_generation_eval_gate
-      (eval → refine code → re-score), present the task summary and code eval
-      scorecard. Request user approval of the **bug fix code changes** for this
-      task. Do not start the next task until the user approves. On approve: write
+      After implementation and verification (see schema task_verification),
+      present the task summary and verification/test results. Request user
+      approval of the bug fix code changes for this task. Do not start the
+      next task until the user approves. On approve: write
       implementation/task-reports/<task-id>.md, mark the task `- [x]` in tasks.md.
     skip: tasks already marked `- [x]` in tasks.md
-    cwd: fork working copy (see fork_repo.working_copy)
+    cwd: >-
+      fork working copy (see fork_repo.working_copy), or project working
+      folder when use_working_folder_as_repo is true
   task_loop:
     for_each_pending_task:
       order_by: tasks.md §2 Linear Execution Order; respect §1 DAG
       steps:
-        - Compose design-bundle.md scoped to current Task ID only
-        - Resolve ONE OAPE command per command_resolution (allowed_commands only)
-        - Invoke that command in fork cwd (read .cursor/commands/<command_file>)
-        - Execute manual-agent work when Assigned Agent is manual (no OAPE command)
-        - Verify per task Acceptance criteria; record pass/fail
-        - Run code_generation_eval_gate — score fork code; refine code until evals
-          pass or max_refinement_passes (2); do NOT ask user approval before this completes
-        - Present task summary with code eval scorecard
-        - Request user code approval (task_approval_gate / code_generation_eval_gate.task_approval_prompt)
-        - On reject: REVISION FEEDBACK in design-bundle; re-run current task only
         - >-
-          On approve: write implementation/task-reports/<task-id>.md; mark task `- [x]`
+          Read context files (agents.md, constitution.md, bug-report.md,
+          rca-report.md, bugfix-plan.md), and tasks.md §4 payload for this Task ID
+        - Implement the fix directly using FILE OPERATIONS
+        - Run task_verification (build/vet/test/make targets from Acceptance criteria)
+        - >-
+          Fix and re-verify until passing (no fixed pass cap — do not ask
+          approval before verification passes or the agent flags a blocker)
+        - Present task summary with verification/test results
+        - Request user approval (task_approval_gate / task_verification.task_approval_prompt)
+        - On reject: incorporate feedback into implementation approach; re-run current task only
+        - On approve: write implementation/task-reports/<task-id>.md; mark task `- [x]`
         - Advance to next pending task in §2 order
-  task_approval_prompt: >-
-    Code eval score: {overall_score}% ({cases_pass}/{cases_total} cases pass).
-    Approve the bug fix code changes for task {task_id} ({task_title}) and
-    proceed to the next task? (Approve / Reject with feedback)
-  command_order:
-    - id: api-generate
-      command: /oape:api-generate
-      command_file: api-generate.md
-      when: >-
-        NOT an e2e task AND current task Assigned Agent is API_Agent AND task is
-        NOT verification-only
-      args: "--design-doc <design-bundle-path>"
-      follow_up: make update && make verify
-    - id: api-generate-tests
-      command: /oape:api-generate-tests
-      command_file: api-generate-tests.md
-      when: >-
-        NOT an e2e task AND current task Assigned Agent is API_Agent AND task is
-        verification-only
-      args: "<api-path-from-task-target-files>"
-      path_resolution: >-
-        Derive from tasks.md §4 Target file(s) for the current task — use api/
-        directory or *_types.go parent directory. Fall back to repo code inspection.
-    - id: api-implement
-      command: /oape:api-implement
-      command_file: api-implement.md
-      when: >-
-        NOT an e2e task AND current task Assigned Agent is OperatorController_Agent
-      args: "--design-doc <design-bundle-path>"
-      follow_up: make generate && make manifests && make build && make test
-    - id: e2e-generate
-      command: /oape:e2e-generate
-      command_file: e2e-generate.md
-      when: current task is an e2e task (see e2e_task)
-      args: "<fork-default-branch>"
-  agent_routing:
-    API_Agent:
-      verification_only: api-generate-tests
-      implementation: api-generate
-    OperatorController_Agent: api-implement
-    Testing_Agent: e2e-generate
-    e2e_task: e2e-generate
-    ManifestsBindata_Agent: manual
-    WebhookTLS_Agent: manual
-    RBACSecurity_Agent: manual
-    OLMRelease_Agent: manual
-    Docs_Agent: manual
-  manual_agents: >-
-    Agents marked manual have no OAPE command. For each manual task, execute the
-    task payload from the design bundle with minimal scoped edits in the fork
-    working copy. Follow constitution.md and repo patterns. Log deviations.
   verification: >-
-    After each task's OAPE commands or manual implementation, run Makefile targets
-    named in that task's Acceptance criteria and bugfix-plan.md verification hooks
+    After implementing each task, run Makefile targets and test commands named
+    in that task's Acceptance criteria and bugfix-plan.md verification matrix
     when applicable. Record pass/fail in the task summary and task report.
   prerequisites:
-    - gh (authenticated)
     - go
     - git
     - make
-    - >-
-      OAPE command files in .cursor/commands/ — api-generate.md, api-generate-tests.md,
-      api-implement.md, e2e-generate.md only
+    - gh (authenticated) — only needed when opening a draft PR (default mode)
 
 # ---------------------------------------------------------------------------
 # Workflow stages (source of truth)
@@ -964,7 +815,7 @@ workflow:
     inputs:
       - bug-report.md
       - GitHub repository (inputs/jira.yaml target_repo — required; see schema target_repo)
-      - AGENTS.md (optional — ask user if missing; see agents_md.when_missing)
+      - agents.md (REQUIRED — openspec/inputs/agents.md, else target repo AGENTS.md/agents.md; see agents_md)
       - User-provided logs, must-gather data, or cluster access
     outputs:
       - repro-verification-report.md
@@ -982,18 +833,21 @@ workflow:
       - repro-verification-report.md
       - ard-context.md (ARD from original PRs)
       - pr-diffs/ (original development PR diffs)
-      - AGENTS.md (optional — for component mapping)
+      - agents.md (REQUIRED — component mapping; see agents_md)
     outputs:
       - rca-report.md
     gate: user_approval
     feedback_gate: user_approval_feedback_gate
 
   - id: bugfix-planning
-    name: Bug Fix Planning Stage
+    name: Bug Fix Planning Stage (internal)
     description: >-
-      Plan the targeted bug fix using approved RCA findings, constitution
-      (input), and bug context. Focus on minimal change scope, regression
-      test strategy, and rollback plan.
+      Internal-only stage: silently plans the targeted bug fix using approved
+      RCA findings, constitution (input), and bug context, producing
+      bugfix-plan.md as background context for Task Creation. bugfix-plan.md
+      is NOT presented to the user and has no approval gate — the agent
+      generates it, then proceeds directly into the Bug Fix Task Creation
+      Stage to ask any clarifying questions before authoring tasks.md.
       Constitution.md is resolved via schema constitution_md.lookup_order
       before this stage.
     inputs:
@@ -1001,25 +855,29 @@ workflow:
       - repro-verification-report.md
       - rca-report.md
       - constitution.md (input — resolved via constitution_md.lookup_order; see schema constitution_md)
-      - AGENTS.md (optional — ask user if missing; see agents_md.when_missing)
+      - agents.md (REQUIRED — see agents_md)
       - bug-validation.json
     outputs:
       - bugfix-plan.md
-    gate: user_approval
-    feedback_gate: user_approval_feedback_gate
+    gate: agent_internal
+    feedback_gate: none
 
   - id: bugfix-task-creation
     name: Bug Fix Task Creation Stage
     description: >-
-      Decompose the approved bug fix plan into an execution backlog (tasks.md).
-      Bug fixes are typically single-phase: fix implementation, regression test
-      generation, and verification that reproduction steps no longer fail.
+      Decompose the root cause and the internally-generated bugfix-plan.md
+      into an execution backlog (tasks.md). bugfix-plan.md itself is never
+      shown to the user — before generating tasks.md, ask any clarifying
+      questions needed to scope the backlog (task sizing, open questions
+      flagged in bugfix-plan.md §8). Bug fixes are typically single-phase:
+      fix implementation, regression test generation, and verification that
+      reproduction steps no longer fail.
     inputs:
       - bug-report.md
       - constitution.md (input — resolved via constitution_md.lookup_order)
       - rca-report.md
-      - bugfix-plan.md
-      - AGENTS.md (optional — ask user if missing; see agents_md.when_missing)
+      - bugfix-plan.md (internal — generated automatically, not shown to the user)
+      - agents.md (REQUIRED — see agents_md)
     outputs:
       - tasks.md
     gate: user_approval
@@ -1029,9 +887,7 @@ workflow:
     name: Bug Fix Implementation Stage
     description: >-
       Begins after tasks in tasks.md are approved. Implements bug fix tasks
-      task-by-task. Code generation strategy is determined by config.yaml
-      flags.codegen_mode: ai-helpers uses OAPE command routing and code eval
-      gate; direct uses plain agent implementation.
+      task-by-task via direct FILE OPERATIONS (see schema direct_implementation).
       **Default:** The agent asks for fork_repo_url, clones the fork, and drives
       tasks task-by-task; when complete, pushes a draft PR.
       **Working-folder mode:** Uses the current project checkout (see schema
@@ -1145,12 +1001,14 @@ artifacts:
       ## Inputs
       - Approved bug-report.md (steps to reproduce, expected/actual behavior)
       - Target repository (code inspection, git metadata)
-      - agents.md (INPUT — resolved via lookup; contains operator architecture and component mapping)
+      - agents.md (REQUIRED INPUT — openspec/inputs/agents.md, else target repo AGENTS.md/agents.md)
       - User-provided logs, must-gather data, or environment traces
 
       ## Process
       0. Resolve repo target (REQUIRED — see schema target_repo and working_folder_repo).
-      1. Resolve agents.md: check target repo, then schema inputs/.
+      1. Resolve agents.md (REQUIRED — see schema agents_md.lookup_order):
+         prefer openspec/inputs/agents.md; if absent, require AGENTS.md/agents.md
+         in the target repo. STOP if still missing (do not invent agent IDs).
       2. Execute reproduction steps as documented in bug-report.md.
          Prefer Cursor agent chat / repo-local reproduction (tests, envtest,
          make targets) or must-gather / user-provided logs when that confirms
@@ -1193,7 +1051,7 @@ artifacts:
       - Approved repro-verification-report.md (logs, failure signature)
       - ard-context.md (original PR intent and architecture decisions)
       - pr-diffs/ (original development PR diffs)
-      - agents.md (optional — for component mapping)
+      - agents.md (REQUIRED — component mapping; see schema agents_md)
       - Target repository (current code state for comparison)
 
       ## Process
@@ -1202,7 +1060,7 @@ artifacts:
       3. Compare current code state vs original PR diffs to identify where behavior diverged.
       4. Identify the root cause — the specific code path, condition, or interaction causing the bug.
          Distinguish root cause from symptoms and secondary effects.
-      5. Map affected components to AGENTS.md subsystems when available.
+      5. Map affected components to agents.md subsystems.
       6. Validate ARD/PR cross-references are consistent.
       7. Recommend the fix area and approach (without writing code).
 
@@ -1230,27 +1088,31 @@ artifacts:
     workflow_stage: bugfix-planning
     generates: bugfix-plan.md
     format: markdown
-    description: Bug Fix Plan — targeted fix approach with minimal blast radius
+    description: >-
+      Bug Fix Plan — internal context artifact with the targeted fix approach
+      and minimal blast radius. Generated silently; never presented to the
+      user for approval. Feeds tasks.md authoring only.
     template: bugfix-plan-template.md
     inputs:
       required:
         - bug-report.md
         - rca-report.md
         - constitution.md (INPUT — resolved via schema constitution_md.lookup_order)
+        - agents.md (REQUIRED — see schema agents_md.lookup_order)
       optional:
         - repro-verification-report.md
-        - AGENTS.md
-        - agents.md
         - bug-validation.json
     instruction: |
       Create bugfix-plan.md — the Bug Fix Plan for the identified root cause.
+      This is an INTERNAL artifact: do not present it or its contents to the
+      user, and do not ask for approval on it.
 
       ## Input precedence (conflicts)
       1. constitution.md (non-negotiable guardrails — resolved as INPUT, not generated)
       2. rca-report.md (root cause analysis findings)
       3. bug-report.md (bug details, ARD context, PR references)
       4. repro-verification-report.md (reproduction evidence, failure signature)
-      5. AGENTS.md (optional — agent routing)
+      5. agents.md (REQUIRED — agent routing; see schema agents_md)
 
       ## Process
       0. Resolve constitution.md (see schema constitution_md.lookup_order).
@@ -1264,17 +1126,16 @@ artifacts:
       3. Do NOT create tasks, tickets, or code — planning only.
       4. Bug fixes are typically single-phase — do not over-engineer multi-phase plans.
 
-      ## APPROVAL GATE
-      After writing bugfix-plan.md:
-      0. **Eval gate**: score bugfix-plan.md against evals/bugfix-plan_eval.yaml.
-      1. SUMMARIZE: fix approach, files to change, regression test strategy, risks.
-      2. ASK: Approve bugfix-plan.md and proceed to Task Creation?
-      3. ON REJECT: Run user_approval_feedback_gate — regenerate bugfix-plan.md only.
-      4. ON APPROVE: Lock bugfix-plan.md as immutable; unlock Task Creation Stage.
+      ## No user approval — internal handoff
+      Write bugfix-plan.md and mark it done automatically (no scorecard, no
+      approval question, no feedback loop). Immediately continue into the Bug
+      Fix Task Creation Stage: read bugfix-plan.md §8 Open Questions and ask
+      the user any clarifying questions needed before generating tasks.md
+      (see artifact `tasks`). Do not stop the response solely to show
+      bugfix-plan.md.
     gate:
-      type: approval
-      evaluated_by: user
-      feedback_gate: user_approval_feedback_gate
+      type: informational
+      evaluated_by: agent
     requires:
       - bug-report
       - rca
@@ -1292,14 +1153,21 @@ artifacts:
         - constitution.md
         - rca-report.md
         - bugfix-plan.md
+        - agents.md (REQUIRED — see schema agents_md.lookup_order)
       optional:
         - repro-verification-report.md
-        - AGENTS.md
-        - agents.md
     instruction: |
       Create tasks.md — a Bug Fix Execution Backlog for downstream code generation.
 
       You are the Sub-Task Creation Agent. Follow tasks.md (base template — shared rules).
+
+      ## Before generating tasks.md
+      bugfix-plan.md was generated silently in the previous step (see artifact
+      bugfix-plan) — it has no user approval gate. Do not present it or ask the
+      user to approve it. Instead, read bugfix-plan.md §8 Open Questions and
+      ask the user any clarifying questions needed to scope the backlog (e.g.
+      task size range via schema task_sizing, ambiguous fix approach choices).
+      Once answered — or the user has none — generate tasks.md directly.
 
       ## Bug fix task generation
       Bug fixes are typically single-phase. Generate all tasks in one shot:
@@ -1312,7 +1180,7 @@ artifacts:
       2. rca-report.md (root cause findings)
       3. bugfix-plan.md (fix approach and target files)
       4. bug-report.md (bug details)
-      5. agents.md (routing)
+      5. agents.md (REQUIRED — routing)
 
       ## Required output structure (§0–§5)
       - §0 Input coverage checklist — map RCA findings and fix approach to Task IDs
@@ -1328,7 +1196,7 @@ artifacts:
       Header fields: Bug, AgentRoutingMode (from constitution), ConstitutionVersion.
 
       ## Agent routing
-      Same as feature workflow — use AGENTS.md IDs or provisional IDs.
+      Assigned Agent values MUST match IDs from the resolved agents.md.
 
       ## Hard boundaries
       - Do NOT write production code, patches, or diffs.
@@ -1352,24 +1220,21 @@ artifacts:
       mode: single
       modes_supported:
         - single
-      scratch_dir: output/_stage4
     requires:
       - bugfix-plan
 
   - id: implementation
     workflow_stage: bugfix-implementation
-    generates: implementation/design-bundle.md
-    template: design-bundle-template.md
+    generates: implementation/task-reports/<task-id>.md
+    template: implementation-task-report-template.md
     description: >-
-      Task-by-task bug fix execution into the fork (or working folder). Mode
-      depends on config.yaml flags.codegen_mode:
-        ai-helpers — composed design-bundle.md + /oape:* cursor commands + code eval gate.
-        direct — agent reads context files, implements code directly, no OAPE.
-      User approval after every task before advancing.
+      Task-by-task bug fix execution into the fork (or working folder), direct
+      mode only: the agent reads context files and implements code directly
+      via FILE OPERATIONS — no OAPE commands, no design bundle, no code eval
+      gate. User approval after every task before advancing.
     outputs:
       - code changes in user's fork (or project working folder when use_working_folder_as_repo)
       - draft pull request on fork_repo_url (skipped in working-folder mode)
-      - implementation/design-bundle.md (per task, regenerated)
       - implementation/task-reports/<task-id>.md (per approved task)
       - implementation-report.md
       - deviation-observed.md (conditional)
@@ -1380,34 +1245,25 @@ artifacts:
         - bug-report.md
         - rca-report.md
         - bugfix-plan.md
+        - agents.md (REQUIRED — see schema agents_md.lookup_order)
         - forked repository URL (inputs/jira.yaml fork_repo_url — ask user if missing;
           **skip when use_working_folder_as_repo is true**)
       optional:
         - repro-verification-report.md
         - target repository (inputs/jira.yaml target_repo — upstream reference)
-        - AGENTS.md
-        - agents.md
     instruction: |
-      You are the Bug Fix Implementation Orchestrator.
-
-      ## Mode
-      Read config.yaml → flags.codegen_mode (default: "direct"):
-      - **ai-helpers**: OAPE command routing + code-generation eval gate
-      - **direct**: plain agent implementation, no OAPE commands, no code eval gate
+      You are the Bug Fix Implementation Orchestrator. See schema direct_implementation
+      for the full task loop.
 
       ## Mission
       Execute approved tasks.md **task-by-task** in §2 Linear Execution Order.
       Focus on minimal, targeted bug fix code changes that address the root cause
       identified in rca-report.md.
 
-      **ai-helpers mode**: For each task, compose a design bundle scoped to that
-      Task ID, invoke applicable OAPE cursor commands (see schema oape_routing),
-      verify, run **code-generation evals**, refine code until evals pass, then
-      **request user approval of the code** before advancing to the next task.
-
-      **direct mode**: For each task, read context files (agents.md, constitution.md,
-      bug-report.md, rca-report.md, bugfix-plan.md, task §4 payload), implement
-      bug fix code directly, verify, then **request user approval** before advancing.
+      For each task: read context files (agents.md, constitution.md, bug-report.md,
+      rca-report.md, bugfix-plan.md, task §4 payload), implement the fix directly
+      via FILE OPERATIONS, run task_verification, then **request user approval**
+      before advancing to the next task.
 
       Work in the user's fork working copy, **or the project working folder when
       use_working_folder_as_repo is true**. Push and open draft PR when all tasks
@@ -1416,28 +1272,21 @@ artifacts:
       ## Prerequisites
       Confirm in openspec/changes/<change>/:
       - tasks.md, constitution.md, bug-report.md, rca-report.md, bugfix-plan.md (approved)
-      - **ai-helpers mode**: OAPE commands in .cursor/commands/
-      - gh, go, git, make available
+      - gh (only if opening a draft PR), go, git, make available
 
       ## Repo / fork setup
-      Same as feature workflow — see schema fork_repo and working_folder_repo.
+      See schema fork_repo and working_folder_repo.
 
-      ## Task execution loop — ai-helpers mode (codegen_mode = ai-helpers)
-
-      ### Design bundle (each task)
-      1. Create openspec/changes/<change>/implementation/ if missing.
-      2. Write implementation/design-bundle.md using templates/design-bundle-template.md.
-      3. Include constitution, bug-report, rca-report, bugfix-plan, repro-verification
-         excerpts + §4 payload for ONLY the **current Task ID**.
-      4. On task rejection, add REVISION FEEDBACK and regenerate bundle.
-
-      ### Per-task steps (ai-helpers)
-      Same as feature workflow — compose, resolve command, announce, invoke, verify,
-      code eval gate, present, ask approval, on reject/approve.
-
-      ## Task execution loop — direct mode (codegen_mode = direct)
-      Same as feature workflow but reads bug fix context (rca-report.md, bug-report.md)
-      instead of specs.md.
+      ## Task execution loop (see schema direct_implementation.task_loop)
+      1. Read context files listed above plus tasks.md §4 payload for the
+         current Task ID only.
+      2. Implement the fix directly via FILE OPERATIONS.
+      3. Run task_verification (build/vet/test/make targets from Acceptance criteria).
+      4. Fix and re-verify until passing.
+      5. Present task summary with verification/test results.
+      6. Request user approval; on reject, incorporate feedback and re-run this
+         task only; on approve, write implementation/task-reports/<task-id>.md
+         and mark the task `- [x]` in tasks.md.
 
       ## Post-loop (all tasks approved)
       1. Present summary: tasks completed, files changed, test results.
@@ -1449,21 +1298,13 @@ artifacts:
       type: per_task_approval
       evaluated_by: user
       feedback_gate: user_approval_feedback_gate
-      prompt: >-
-        ai-helpers mode: see schema oape_routing.task_approval_prompt (includes eval score).
-        direct mode: "Approve the bug fix code changes for task {task_id} ({task_title})?"
+      prompt: "Approve the bug fix code changes for task {task_id} ({task_title})?"
       on_reject: >-
-        ai-helpers mode: Run user_approval_feedback_gate per_task_implementation_variant:
-        append user feedback to design-bundle.md REVISION FEEDBACK; re-run OAPE commands
-        for the current task only.
-        direct mode: Incorporate feedback into implementation approach; re-run current
-        task only.
-        Both modes: do not mark the task complete, do not advance to the next task,
+        Incorporate feedback into implementation approach; re-run current task
+        only. Do not mark the task complete, do not advance to the next task,
         and do not modify approved upstream artifacts.
       on_command_failure: >-
-        ai-helpers mode: Report OAPE precheck or execution failure; do not advance
-        until resolved or user directs otherwise.
-        direct mode: Report verification or test failure; do not advance until resolved.
+        Report verification or test failure; do not advance until resolved.
     requires:
       - tasks
 
@@ -1483,9 +1324,8 @@ artifacts:
       - **Summary** — one paragraph overview of the bug fix
       - **Root Cause** — reference to rca-report.md findings
       - **Per-Task Reports** — table linking each approved task to
-        `implementation/task-reports/<task-id>.md` with eval score and test status
+        `implementation/task-reports/<task-id>.md` with test status
       - **All Files Changed** — grouped by task (from task reports)
-      - **Code Generation Eval Summary** — aggregate pass/fail across all tasks
       - **Test Results Summary** — including regression tests
       - **Regression Test Coverage** — map every file touched to the root cause and
         regression tests that prevent recurrence
@@ -1537,7 +1377,8 @@ apply:
     - repro-verification
     - rca
     - constitution.md (input — resolved via constitution_md.lookup_order)
-    - AGENTS.md
+  required_context:
+    - agents.md (REQUIRED — openspec/inputs/ first, else target repo; see agents_md)
   fork_repo: >-
     {fork_repo_url from inputs/jira.yaml — ask at stage start if missing in default
     mode; skip when use_working_folder_as_repo is true — use project cwd instead}
@@ -1545,23 +1386,19 @@ apply:
     {working_folder_path from inputs/jira.yaml when use_working_folder_as_repo is true}
   upstream_repo: "{target_repo from inputs/jira.yaml — reference only}"
   tracks: tasks.md
-  codegen_mode: "config.yaml → flags.codegen_mode (ai-helpers | direct)"
-  oape_routing: "applies when codegen_mode = ai-helpers"
+  implementation_mode: direct (see schema direct_implementation)
   instruction: |
-    Execute the Bug Fix Implementation Stage. Read config.yaml → flags.codegen_mode
-    to determine the code generation strategy. Follow the `implementation` artifact
-    instruction. When codegen_mode = ai-helpers, also follow schema `oape_routing`.
+    Execute the Bug Fix Implementation Stage. Follow the `implementation`
+    artifact instruction and schema `direct_implementation`.
 
     Entry: /opsx:apply on a change where tasks.md and upstream artifacts are approved.
 
-    FIRST STEP: Read inputs/jira.yaml for use_working_folder_as_repo. Read
-    config.yaml → flags.codegen_mode (default: "direct").
+    FIRST STEP: Read inputs/jira.yaml for use_working_folder_as_repo.
 
     FOR EACH pending task in §2 Linear Execution Order (respect §1 Depends On):
-
-      **ai-helpers mode:** Same as feature workflow but with bug fix context.
-      **direct mode:** Same as feature workflow but reads rca-report.md and
-      bug-report.md instead of specs.md.
+      Read context (agents.md, constitution.md, bug-report.md, rca-report.md,
+      bugfix-plan.md, task §4 payload), implement the fix directly via FILE
+      OPERATIONS, run task_verification, then request user approval.
 
     After all tasks: write implementation-report.md aggregating all task-reports/.
     Do not advance to the next task until the user approves the code for the current task.

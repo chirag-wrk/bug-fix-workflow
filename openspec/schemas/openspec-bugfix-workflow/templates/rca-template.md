@@ -13,7 +13,7 @@
 | `bug-report.md` | **YES** | ARD context, PR references, bug details |
 | `ard-context.md` | Recommended | Original PR intent and architecture decisions |
 | `pr-diffs/` | Recommended | Original development PR diffs for comparison |
-| `agents.md` | Optional | Component mapping for affected subsystem identification |
+| `agents.md` | **YES** | Component mapping for affected subsystem identification (inputs/ or target repo) |
 | Target repository | **YES** | Current code state for tracing failure paths |
 
 ## Process
@@ -54,7 +54,7 @@ Fill in every section. Replace bracketed placeholders with actual values.
 | bug-report.md | [path] |
 | ard-context.md | PROVIDED / NOT_PROVIDED |
 | pr-diffs/ | [N] PRs ingested / NOT_PROVIDED |
-| agents.md | PROVIDED / NOT_PROVIDED |
+| agents.md | [path — REQUIRED] |
 
 ## 1. Failure Path Analysis
 ### Symptom
